@@ -1,0 +1,104 @@
+/* Chat component styles scoped to existing chatDetail structure */
+:root{ --chat-bg:#050506; --panel:#0b0b0d; --muted:#8b8b93; --incoming:#1f1f23; --out-left:#06b6d4; --out-right:#ff6b9e; }
+/* Ensure high specificity by scoping under #chatDetail */
+#chatDetail { display:flex; flex-direction:column; height:100%; background:var(--chat-bg); }
+#chatDetail .chat-header{height:72px;flex:0 0 72px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.02);}
+#chatDetail .chat-header .back-btn{background:transparent;border:0;color:#dfe6ff;font-weight:600;padding:8px 10px;border-radius:8px;cursor:pointer}
+#chatDetail .chat-header .chat-info{flex:1;display:flex;flex-direction:column;align-items:center;max-width:60%;margin:0 12px}
+#chatDetail .chat-header .header-actions{display:flex;gap:8px}
+#chatDetail .messages-log{flex:1 1 auto;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+#chatDetail .messages-log::-webkit-scrollbar{width:8px}
+#chatDetail .messages-log::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.04);border-radius:8px}
+
+#chatDetail .message{max-width:74%;padding:10px 12px;border-radius:14px;position:relative;box-shadow:0 6px 20px rgba(0,0,0,0.5)}
+#chatDetail .message span{white-space:pre-wrap}
+#chatDetail .message.other{align-self:flex-start;background:var(--incoming);color:#d7d7da;border-top-left-radius:6px}
+#chatDetail .message.own{align-self:flex-end;background:var(--panel);color:#fff;border-top-right-radius:6px}
+#chatDetail .message.own.gradient{background:linear-gradient(135deg,var(--out-left),var(--out-right));color:#06131a}
+#chatDetail .message .meta{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--muted)}
+#chatDetail .checkmark{position:absolute;right:8px;bottom:6px;font-size:12px;color:rgba(255,255,255,0.7)}
+#chatDetail .audio-player{display:flex;align-items:center;gap:8px}
+#chatDetail .audio-play{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.03);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+
+#chatDetail .chat-footer{height:72px;flex:0 0 72px;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid rgba(255,255,255,0.02);}
+#chatDetail .chat-footer .media-actions{display:flex;gap:8px}
+#chatDetail .chat-footer .media-btn{background:transparent;border:0;color:#dfe6ff;font-size:20px;padding:8px;border-radius:8px;cursor:pointer}
+#chatDetail .chat-footer #messageInput{width:100%;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02);color:#fff;resize:none;min-height:40px;max-height:120px}
+#chatDetail .chat-footer .send-btn{background:linear-gradient(135deg,var(--out-left),var(--out-right));border:0;color:#06131a;padding:10px;border-radius:12px;cursor:pointer;font-weight:700}
+
+/* Responsive tweaks */
+@media (max-width:640px){ #chatDetail .message{max-width:86%} #chatDetail .chat-header .chat-info{max-width:60%} }
+
+/* Message status indicator and animations */
+#chatDetail .message-status{display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:11px;color:var(--muted);opacity:0.95;transition:opacity 220ms ease, transform 220ms ease}
+#chatDetail .message-status .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.12);display:inline-block;transform:scale(1);transition:transform 260ms ease, background 260ms ease}
+#chatDetail .message-status.status-sending .dot{background:linear-gradient(90deg,var(--out-left),var(--out-right));animation:pulse 1s infinite}
+#chatDetail .message-status.status-sent .dot{background:rgba(255,255,255,0.18);transform:scale(1)}
+#chatDetail .message-status.status-delivered .dot{background:var(--out-left);transform:scale(1.15)}
+#chatDetail .message-status.status-seen .dot{background:linear-gradient(90deg,#6ee7b7,#60a5fa);transform:scale(1.3)}
+#chatDetail .message .status-text{font-size:11px;color:var(--muted);margin-left:4px}
+
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* New message indicator pulse */
+#newMessageIndicator.pulse{animation:pop 600ms ease infinite}
+@keyframes pop{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+
+/* Chat header small status */
+#chatDetail .chat-last-status{opacity:0.9;transition:opacity 180ms ease,color 180ms ease}
+#chatDetail .chat-last-status.status-sending{color:var(--muted)}
+#chatDetail .chat-last-status.status-sent{color:rgba(255,255,255,0.75)}
+#chatDetail .chat-last-status.status-delivered{color:var(--out-left)}
+#chatDetail .chat-last-status.status-seen{color:#6ee7b7;font-weight:700}
+/* Chat component styles scoped to existing chatDetail structure */
+:root{ --chat-bg:#050506; --panel:#0b0b0d; --muted:#8b8b93; --incoming:#1f1f23; --out-left:#06b6d4; --out-right:#ff6b9e; }
+/* Ensure high specificity by scoping under #chatDetail */
+#chatDetail { display:flex; flex-direction:column; height:100%; background:var(--chat-bg); }
+#chatDetail .chat-header{height:72px;flex:0 0 72px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.02);}
+#chatDetail .chat-header .back-btn{background:transparent;border:0;color:#dfe6ff;font-weight:600;padding:8px 10px;border-radius:8px;cursor:pointer}
+#chatDetail .chat-header .chat-info{flex:1;display:flex;flex-direction:column;align-items:center;max-width:60%;margin:0 12px}
+#chatDetail .chat-header .header-actions{display:flex;gap:8px}
+#chatDetail .messages-log{flex:1 1 auto;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+#chatDetail .messages-log::-webkit-scrollbar{width:8px}
+#chatDetail .messages-log::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.04);border-radius:8px}
+
+#chatDetail .message{max-width:74%;padding:10px 12px;border-radius:14px;position:relative;box-shadow:0 6px 20px rgba(0,0,0,0.5)}
+#chatDetail .message span{white-space:pre-wrap}
+#chatDetail .message.other{align-self:flex-start;background:var(--incoming);color:#d7d7da;border-top-left-radius:6px}
+#chatDetail .message.own{align-self:flex-end;background:var(--panel);color:#fff;border-top-right-radius:6px}
+#chatDetail .message.own.gradient{background:linear-gradient(135deg,var(--out-left),var(--out-right));color:#06131a}
+#chatDetail .message .meta{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--muted)}
+#chatDetail .checkmark{position:absolute;right:8px;bottom:6px;font-size:12px;color:rgba(255,255,255,0.7)}
+#chatDetail .audio-player{display:flex;align-items:center;gap:8px}
+#chatDetail .audio-play{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.03);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+
+#chatDetail .chat-footer{height:72px;flex:0 0 72px;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid rgba(255,255,255,0.02);}
+#chatDetail .chat-footer .media-actions{display:flex;gap:8px}
+#chatDetail .chat-footer .media-btn{background:transparent;border:0;color:#dfe6ff;font-size:20px;padding:8px;border-radius:8px;cursor:pointer}
+#chatDetail .chat-footer #messageInput{width:100%;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02);color:#fff;resize:none;min-height:40px;max-height:120px}
+#chatDetail .chat-footer .send-btn{background:linear-gradient(135deg,var(--out-left),var(--out-right));border:0;color:#06131a;padding:10px;border-radius:12px;cursor:pointer;font-weight:700}
+
+/* Responsive tweaks */
+@media (max-width:640px){ #chatDetail .message{max-width:86%} #chatDetail .chat-header .chat-info{max-width:60%} }
+
+/* Message status indicator and animations */
+#chatDetail .message-status{display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:11px;color:var(--muted);opacity:0.95;transition:opacity 220ms ease, transform 220ms ease}
+#chatDetail .message-status .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.12);display:inline-block;transform:scale(1);transition:transform 260ms ease, background 260ms ease}
+#chatDetail .message-status.status-sending .dot{background:linear-gradient(90deg,var(--out-left),var(--out-right));animation:pulse 1s infinite}
+#chatDetail .message-status.status-sent .dot{background:rgba(255,255,255,0.18);transform:scale(1)}
+#chatDetail .message-status.status-delivered .dot{background:var(--out-left);transform:scale(1.15)}
+#chatDetail .message-status.status-seen .dot{background:linear-gradient(90deg,#6ee7b7,#60a5fa);transform:scale(1.3)}
+#chatDetail .message .status-text{font-size:11px;color:var(--muted);margin-left:4px}
+
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* New message indicator pulse */
+#newMessageIndicator.pulse{animation:pop 600ms ease infinite}
+@keyframes pop{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+
+/* Chat header small status */
+#chatDetail .chat-last-status{opacity:0.9;transition:opacity 180ms ease,color 180ms ease}
+#chatDetail .chat-last-status.status-sending{color:var(--muted)}
+#chatDetail .chat-last-status.status-sent{color:rgba(255,255,255,0.75)}
+#chatDetail .chat-last-status.status-delivered{color:var(--out-left)}
+#chatDetail .chat-last-status.status-seen{color:#6ee7b7;font-weight:700}

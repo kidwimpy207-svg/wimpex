@@ -9,11 +9,12 @@
   <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%230a0e27' width='180' height='180'/><text x='90' y='120' font-size='80' font-weight='900' text-anchor='middle' fill='%23d4af37'>✨</text></svg>">
   <title>Wimpex - Gold Stories</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="chat_component.css">
 </head>
 <body>
   <a class="skip-link" href="#main" style="position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden;">Skip to content</a>
   <!-- Auth Modals -->
-  <div id="authContainer" class="auth-container">
+  <div id="authContainer" class="auth-container" style="display:block;">
     <div class="auth-card">
       <div class="auth-header">✨ Wimpex</div>
       <div id="authTabs" class="auth-tabs">
@@ -30,7 +31,7 @@
         </div>
         <input id="loginInput" type="text" placeholder="Email / Phone / Username" required>
         <input id="loginPassword" type="password" placeholder="Password" required>
-        <button type="submit" class="gold-btn">Login</button>
+        <button id="loginBtn" type="submit" class="gold-btn">Login</button>
         <div style="margin-top:8px;text-align:right;"><a id="forgotLink" href="#" style="color:var(--gold);font-weight:600;">Forgot password?</a></div>
       </form>
 
@@ -78,29 +79,39 @@
           <div id="forgotStatus" style="margin-top:12px;color:var(--text-secondary);"></div>
         </div>
       </div>
+      <!-- Email Verification Modal -->
+      <div id="verifyModal" class="modal hidden">
+        <div class="modal-content">
+          <h2>Verify Your Email</h2>
+          <p>We've sent a verification link to your email. Paste the token below or click resend.</p>
+          <input id="verifyTokenInput" type="text" placeholder="Paste verification token">
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button id="verifyTokenBtn" class="gold-btn">Verify</button>
+            <button id="resendVerifyBtn" class="gold-btn">Resend Email</button>
+            <button id="closeVerifyBtn" class="gold-btn" style="background:transparent;border:2px solid var(--gold);color:var(--gold);">Close</button>
+          </div>
+          <div id="verifyStatus" style="margin-top:12px;color:var(--text-secondary);"></div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Top Navigation -->
-  <nav class="topbar hidden">
-    <div class="logo">✨ Wimpex</div>
-    <form id="searchForm" class="search-form" style="display:inline-block;margin-left:12px;">
-      <input id="searchInput" type="search" placeholder="Search users or tags" aria-label="Search" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#fff;" />
-    </form>
-    <div class="nav-actions">
-      <button id="storiesBtn" class="nav-btn" title="Stories">📖</button>
-      <button id="chatsBtn" class="nav-btn active" title="Messages">💬</button>
-      <button id="recommendationsBtn" class="nav-btn" title="People">👥</button>
-      <button id="cameraBtn" class="nav-btn" title="Create">📸</button>
-      <button id="enableNotificationsBtn" class="nav-btn" title="Notifications">🔔</button>
-      <button id="profileBtn" class="nav-btn" title="Profile">👤</button>
-      <button id="settingsBtn" class="nav-btn" title="Settings">⚙️</button>
-      <button id="logoutBtn" class="nav-btn" title="Logout">🚪</button>
-    </div>
+  <!-- Sidebar Navigation -->
+  <nav class="sidebar hidden">
+    <div class="sidebar-logo">✨</div>
+    <button id="storiesBtn" class="nav-btn" title="Stories">📖</button>
+    <button id="chatsBtn" class="nav-btn active" title="Messages">💬</button>
+    <button id="callsBtn" class="nav-btn" title="Calls">📞</button>
+    <button id="recommendationsBtn" class="nav-btn" title="People">👥</button>
+    <button id="wimpyBtn" class="nav-btn" title="Wimpy">🤖</button>
+    <button id="cameraBtn" class="nav-btn" title="Create">📸</button>
+    <button id="profileBtn" class="nav-btn" title="Profile">👤</button>
+    <button id="settingsBtn" class="nav-btn" title="Settings">⚙️</button>
+    <div class="sidebar-spacer"></div>
   </nav>
 
   <!-- Main Container -->
-  <div class="main-container hidden">
+  <div class="main-container">
     <!-- Stories View -->
     <div id="storiesView" class="view hidden">
       <div class="stories-header">
@@ -123,16 +134,70 @@
         <div id="chatDetail" class="chat-detail hidden">
           <div class="chat-header">
             <button id="backToChats" class="back-btn">← Back</button>
+            <img id="chatHeaderAvatar" class="chat-header-avatar" src="" alt="" style="cursor:pointer;transition:all 0.3s;display:none;">
             <div class="chat-info">
-              <h3 id="chatName"></h3>
-              <span id="chatStatus" class="status-indicator"></span>
+              <h3 id="chatName" style="cursor:pointer;transition:all 0.3s;" title="Click to view profile"></h3>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <span id="chatStatus" class="status-indicator"></span>
+                <span id="chatLastStatus" class="chat-last-status" style="font-size:12px;color:var(--muted);margin-left:6px;">&nbsp;</span>
+                <div style="display:flex;align-items:center;gap:4px;background:rgba(212,175,55,0.12);padding:4px 8px;border-radius:8px;">
+                  <span id="chatStreak" style="font-size:16px;font-weight:600;color:#ff8c00;">🔥 0</span>
+                  <span id="chatFlameHealth" style="font-size:11px;color:#ff8c00;letter-spacing:1px;">░░░░░░░░░░</span>
+                </div>
+              </div>
+            </div>
+            <button id="chatMenuBtn" class="chat-menu-btn">⋮</button>
+            <button id="pinScrollBtn" class="chat-menu-btn" title="Pin to bottom" aria-pressed="false">📌</button>
+            <div id="chatMenu" class="chat-menu hidden">
+              <div class="chat-menu-item">📹 Start Video Call</div>
+              <div class="chat-menu-item">☎️ Start Audio Call</div>
+              <div class="chat-menu-separator" style="height:1px;background:rgba(212,175,55,0.2);margin:8px 0;"></div>
+              <div class="chat-menu-item">👥 Create Group</div>
+              <div class="chat-menu-item">🔍 Search User</div>
+              <div class="chat-menu-item">🌙 Toggle Theme</div>
+              <div class="chat-menu-item">🗑️ Clear Chat</div>
+              <div class="chat-menu-item">🔇 Mute Chat</div>
             </div>
           </div>
           <div id="messagesLog" class="messages-log"></div>
+          <div id="newMessageIndicator" class="new-message-indicator hidden" role="button" tabindex="0" aria-hidden="true">
+            <span id="newMessageCount" class="new-message-count">0</span>
+            <span class="new-message-text">New messages • Jump to bottom</span>
+          </div>
           <form id="messageForm" class="message-input">
-            <input id="messageInput" type="text" placeholder="Type a message..." autocomplete="off">
+            <textarea id="messageInput" placeholder="Type a message..." autocomplete="off" style="resize:none;"></textarea>
+            <button type="button" id="msgCameraBtn" class="msg-action-btn" title="Send image, video, or file">📷</button>
+            <button type="button" id="voiceBtn" class="msg-action-btn voice-btn" title="Hold to record voice">🎙️</button>
             <button type="submit" class="send-btn">➤</button>
+            <input id="chatMediaInput" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" style="display:none;">
           </form>
+
+          <!-- Recording indicator (shown while recording) -->
+          <div id="recordingIndicator" class="recording-indicator hidden" aria-hidden="true">
+            <div class="recording-dot" aria-hidden="true"></div>
+            <div class="waveform" aria-hidden="true">
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="wave"></div>
+            </div>
+            <span id="recordingTime">0:00</span>
+          </div>
+
+          <!-- Streak restore modal trigger placed in menu -->
+          <div id="streakRestoreModal" class="modal hidden">
+            <div class="modal-content" style="max-width:420px; text-align:center;">
+              <h2>🔥 Streak Expired</h2>
+              <p id="restoreInfo" style="color:#ff6b6b;margin-bottom:16px;">Your streak has expired. Would you like to restore it?</p>
+              <div style="display:flex;gap:8px;justify-content:center;flex-direction:column;">
+                <button id="useRestoreBtn" class="gold-btn">💫 Use Free Restore <span id="restoreCountText">(3 left)</span></button>
+                <button id="buyRestoreBtn" class="gold-btn" style="background:rgba(212,175,55,0.1);border:2px solid var(--gold);color:var(--gold);">💳 Buy Premium Restore</button>
+              </div>
+              <button class="close-modal-btn" style="margin-top:12px;">Close</button>
+            </div>
+          </div>
+
+
         </div>
       </div>
     </div>
@@ -141,6 +206,10 @@
     <div id="recommendationsView" class="view hidden">
       <div class="recommendations-container">
         <h2>👥 People You May Know</h2>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <input id="peopleSearchInput" type="search" placeholder="Search by username..." style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);">
+          <button id="peopleSearchBtn" class="gold-btn">Search</button>
+        </div>
         <div id="recommendationsList" class="recommendations-grid"></div>
         <div id="noRecommendations" class="empty-state hidden">
           <p>🎉 You follow everyone! Check back later for new users.</p>
@@ -148,22 +217,73 @@
       </div>
     </div>
 
+    <!-- Calls History View -->
+    <div id="callsView" class="view hidden">
+      <div class="calls-container">
+        <div class="calls-header" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.03);">
+          <h2>Call History</h2>
+          <button id="refreshCallsBtn" class="gold-btn">Refresh</button>
+        </div>
+        <div id="callsList" style="padding:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 160px);overflow-y:auto;"></div>
+        <div id="noCalls" class="empty-state hidden" style="padding:16px;text-align:center;color:#999;">No calls yet.</div>
+      </div>
+    </div>
+    <!-- Wimpy Chat View -->
+    <div id="wimpyView" class="view hidden">
+      <div class="wimpy-container" style="padding:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <h2>🤖 Wimpy</h2>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="wimpyRefreshBtn" class="gold-btn">Refresh</button>
+            <button id="wimpyNewBtn" class="gold-btn">New Chat</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <div style="width:280px;max-height:60vh;overflow:auto;border-right:1px solid rgba(255,255,255,0.03);padding-right:8px;" id="wimpyConversationsList">
+            <p style="color:var(--muted);padding:8px;">Loading conversations...</p>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+            <div id="wimpyMessagesLog" class="messages-log" style="max-height:60vh;overflow:auto;padding:12px;background:transparent;border-radius:8px;">Open a conversation or create a new chat.</div>
+            <form id="wimpyForm" style="display:flex;gap:8px;align-items:center;">
+              <input id="wimpyInput" type="text" placeholder="Ask Wimpy something..." style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text-primary);">
+              <button type="button" id="wimpyAttachBtn" class="gold-btn" title="Attach media">📎</button>
+              <input id="wimpyMediaInput" type="file" accept="image/*,video/*" style="display:none">
+              <button type="submit" class="gold-btn">Send</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Avatar full-size modal -->
+    <div id="avatarModal" class="modal hidden">
+      <div class="modal-content" style="max-width:820px;text-align:center;">
+        <img id="avatarModalImg" src="" alt="Avatar" style="max-width:100%;max-height:80vh;border-radius:8px;">
+        <div style="margin-top:12px;"><button class="close-modal-btn">Close</button></div>
+      </div>
+    </div>
+
     <!-- Camera/Snap Creation -->
     <div id="cameraView" class="view hidden">
       <div class="camera-container">
         <video id="cameraStream" class="camera-feed" autoplay playsinline></video>
-        <div class="filter-strip">
+        <div class="filter-strip" role="toolbar" aria-label="Filters">
           <button class="filter-btn active" data-filter="none">Normal</button>
           <button class="filter-btn" data-filter="sepia">Sepia</button>
           <button class="filter-btn" data-filter="grayscale">B&W</button>
           <button class="filter-btn" data-filter="invert">Invert</button>
           <button class="filter-btn" data-filter="blur">Blur</button>
+          <button class="filter-btn" data-filter="warm">Warm</button>
+          <button class="filter-btn" data-filter="cool">Cool</button>
+          <button class="filter-btn" data-filter="vivid">Vivid</button>
+          <button class="filter-btn" data-filter="lomo">Lomo</button>
         </div>
         <div class="camera-controls">
           <button id="snapBtn" class="snap-btn">📸 Snap</button>
           <button id="recordBtn" class="record-btn">⏺ Record</button>
           <button id="swapCameraBtn" class="swap-btn">🔄</button>
+          <button id="galleryBtn" class="snap-btn" title="Upload from gallery">🖼️ Gallery</button>
         </div>
+        <input id="galleryInput" type="file" accept="image/*,video/*" style="display:none;">
         <canvas id="snapCanvas" style="display:none;"></canvas>
       </div>
       <div id="snapPreview" class="snap-preview hidden">
@@ -171,7 +291,15 @@
         <div class="snap-controls">
           <button id="resnapBtn" class="ctrl-btn">Retake</button>
           <input id="snapRecipient" type="text" placeholder="Send to username or 'story'">
-          <button id="sendSnapBtn" class="send-btn gold-btn">Send Snap</button>
+          <textarea id="snapCaption" placeholder="Add a caption (optional)" style="width:100%;margin-top:8px;border-radius:8px;padding:8px;background:rgba(255,255,255,0.02);color:var(--text-primary);height:56px;resize:none;"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+            <button id="openMusicPickerBtn" type="button" class="gold-btn" style="padding:8px 12px;">🎵 Add Music</button>
+            <div id="selectedMusicDisplay" style="color:var(--muted);font-size:13px;">No music selected</div>
+            <input id="snapAudioInput" type="file" accept="audio/*" style="display:none;" />
+            <button id="attachAudioBtn" type="button" class="gold-btn" style="padding:8px 12px;">🎧 Attach Audio</button>
+          </div>
+          <button id="sendSnapBtn" class="send-btn gold-btn" style="margin-top:8px;">Send Snap</button>
+          <input id="selectedMusic" type="hidden" value="" />
         </div>
       </div>
     </div>
@@ -185,9 +313,13 @@
         <div class="profile-stats">
           <div class="stat"><strong id="friendCount">0</strong> Friends</div>
           <div class="stat"><strong id="storyCount">0</strong> Stories</div>
+          <div class="stat"><strong id="profileWimpScore">0</strong> 🏆</div>
+          <div class="stat"><strong id="profileStreakCount">0</strong> 🔥</div>
         </div>
         <button id="editProfileBtn" class="gold-btn">Edit Profile</button>
         <button id="addFriendsBtn" class="gold-btn">👥 Add Friends</button>
+        <button id="shareProfileBtn" class="gold-btn">🔗 Share Profile</button>
+        <button id="backToChatBtn" class="gold-btn" style="display:none;">← Back to Chat</button>
       </div>
     </div>
 
@@ -195,6 +327,26 @@
     <div id="settingsView" class="view hidden">
       <div class="settings-container">
         <h2>⚙️ Settings</h2>
+        <!-- Theme Toggle -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+          <span style="color:var(--text-secondary);font-size:13px;">Theme:</span>
+          <button id="themeToggleBtn" class="theme-toggle" title="Toggle Theme" style="padding:8px 12px;background:rgba(212,175,55,0.1);border:2px solid var(--gold);border-radius:6px;color:var(--gold);cursor:pointer;font-weight:600;">🌙 Dark Mode</button>
+          <button id="themeCyberpunkBtn" class="theme-btn">Cyberpunk</button>
+          <button id="themeNarutoBtn" class="theme-btn">Naruto</button>
+          <button id="themeWarlordBtn" class="theme-btn">Warlord</button>
+          <button id="themeResetBtn" class="theme-btn" title="Reset to default">Reset</button>
+        </div>
+
+        <!-- Notification Preferences -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+          <span style="color:var(--text-secondary);font-size:13px;">Notifications:</span>
+          <button id="openNotifPrefsBtn" class="gold-btn" style="font-size:12px;padding:8px 12px;">🔔 Manage</button>
+        </div>
+
+        <!-- Logout -->
+        <div style="border-top:1px solid rgba(212,175,55,0.2);padding-top:16px;margin-top:16px;">
+          <button id="logoutBtn" class="gold-btn" style="width:100%;background:#ef4444;border:none;color:white;font-weight:600;">🚪 Logout</button>
+        </div>
         <form id="settingsForm" class="settings-form">
           
           <!-- Avatar Section -->
@@ -292,6 +444,48 @@
     </div>
   </div>
 
+  <!-- Music Picker Modal (minimal placeholder until Spotify integration) -->
+  <div id="musicPickerModal" class="modal hidden">
+    <div class="modal-content" style="max-width:520px;">
+      <h2>🎵 Music Picker</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Select a track to attach to your story. This is a lightweight placeholder — connect Spotify in settings for live search.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+        <input id="musicSearchInput" type="search" placeholder="Search Spotify..." style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);">
+        <button id="musicSearchBtn" class="gold-btn">Search</button>
+        <button id="spotifyConnectBtn" class="gold-btn" style="margin-left:6px;padding:8px 10px;">Connect Spotify</button>
+      </div>
+      <div id="musicList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;padding-right:6px;">
+        <div class="music-item" data-id="sample_1" data-name="Breezy Loop" data-artist="Studio" data-preview="">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong>Breezy Loop</strong>
+              <div style="font-size:13px;color:var(--muted);">Studio</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="preview-music-btn gold-btn" type="button" data-preview="">▶️</button>
+              <button class="select-music-btn gold-btn" type="button">Select</button>
+            </div>
+          </div>
+        </div>
+        <div class="music-item" data-id="sample_2" data-name="Sunny Days" data-artist="Composer" data-preview="">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong>Sunny Days</strong>
+              <div style="font-size:13px;color:var(--muted);">Composer</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="preview-music-btn gold-btn" type="button" data-preview="">▶️</button>
+              <button class="select-music-btn gold-btn" type="button">Select</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+        <button id="closeMusicPicker" class="gold-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Onboarding Modal -->
   <div id="onboardingModal" class="modal hidden">
     <div class="modal-content" style="max-width:520px;">
@@ -320,10 +514,12 @@
       <div class="story-content">
         <img id="storyImage" src="" alt="" style="display:none;">
         <video id="storyVideo" style="display:none;" autoplay></video>
+        <audio id="storyAudio" style="display:none;width:100%;margin-top:8px;" controls></audio>
         <div class="story-progress-bar"></div>
       </div>
       <div class="story-info">
         <strong id="storyUsername"></strong>
+        <div id="storyMusicInfo" style="font-size:13px;color:var(--muted);"></div>
         <span id="storyTimestamp"></span>
       </div>
     </div>
@@ -331,12 +527,37 @@
 
   <!-- Edit Profile Modal -->
   <div id="editProfileModal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width:500px;">
       <h2>Edit Profile</h2>
       <form id="editProfileForm">
-        <input id="editBio" type="text" placeholder="Bio" maxlength="100">
-        <button type="submit" class="gold-btn">Save</button>
+        <!-- Avatar Upload -->
+        <div style="margin-bottom:20px;text-align:center;">
+          <img id="editAvatarPreview" src="" alt="Avatar" style="width:100px;height:100px;border-radius:50%;object-fit:cover;margin-bottom:10px;cursor:pointer;border:2px solid gold;">
+          <input id="avatarFileInput" type="file" accept="image/*" style="display:none;">
+          <p style="font-size:12px;color:#666;">Click avatar to change picture</p>
+        </div>
+
+        <!-- Username -->
+        <input id="editUsername" type="text" placeholder="Username (2-30 chars)" maxlength="30" style="margin-bottom:10px;">
+
+        <!-- Bio -->
+        <textarea id="editBio" placeholder="Bio (max 160 chars)" maxlength="160" style="margin-bottom:10px;height:80px;resize:none;"></textarea>
+
+        <!-- Location -->
+        <input id="editLocation" type="text" placeholder="Location" maxlength="50" style="margin-bottom:10px;">
+
+        <!-- Website -->
+        <input id="editWebsite" type="url" placeholder="Website (optional)" maxlength="200" style="margin-bottom:10px;">
+
+        <!-- Private Account Toggle -->
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:15px;">
+          <input id="editPrivateAccount" type="checkbox">
+          <span>Private Account (followers must be approved)</span>
+        </label>
+
+        <button type="submit" class="gold-btn" style="width:100%;">Save Profile</button>
       </form>
+      <button class="close-modal-btn" style="margin-top:10px;">Cancel</button>
     </div>
   </div>
 
@@ -405,6 +626,31 @@
     </div>
   </div>
 
+  <!-- Group Creation Modal -->
+  <div id="groupCreationModal" class="modal hidden">
+    <div class="modal-content" style="max-width:500px;">
+      <h2>👥 Create Group Chat</h2>
+      <form id="groupCreationForm">
+        <input id="groupName" type="text" placeholder="Group name" maxlength="50" required style="width:100%;padding:12px;border:2px solid rgba(212,175,55,0.2);border-radius:8px;background:rgba(212,175,55,0.05);color:var(--text-primary);margin-bottom:12px;">
+        <label style="display:block;margin-bottom:12px;color:var(--text-secondary);font-size:14px;">Select members to add (optional):</label>
+        <div id="groupMembersList" style="max-height:250px;overflow-y:auto;margin-bottom:12px;"></div>
+        <button type="submit" class="gold-btn" style="width:100%;">Create Group</button>
+      </form>
+      <button class="close-modal-btn">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Friend Requests Modal -->
+  <div id="friendRequestsModal" class="modal hidden">
+    <div class="modal-content" style="max-width:500px;">
+      <h2>👥 Friend Requests</h2>
+      <div id="pendingRequestsList" style="max-height:400px;overflow-y:auto;"></div>
+      <div id="noPendingRequests" style="text-align:center;color:var(--text-secondary);padding:20px;">No pending friend requests</div>
+      <button class="close-modal-btn" style="margin-top:16px;">Close</button>
+    </div>
+  </div>
+
   <script src="app.js"></script>
+  <script src="chat_component.js"></script>
 </body>
 </html>

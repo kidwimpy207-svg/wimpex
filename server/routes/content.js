@@ -34,7 +34,7 @@ router.get('/stories', authenticateToken, (req, res) => {
 });
 
 router.post('/stories', authenticateToken, (req, res) => {
-    const { media } = req.body;
+    const { media, caption, music, audio } = req.body;
     if (!media) return res.status(400).json({ error: 'Media required' });
 
     const storyId = genId();
@@ -45,6 +45,9 @@ router.post('/stories', authenticateToken, (req, res) => {
         username: user.username,
         avatar: user.avatar,
         media,
+        caption: caption || '',
+        music: music || null,
+        audio: audio || null,
         views: [],
         createdAt: Date.now(),
         expiresAt: Date.now() + 24 * 60 * 60 * 1000

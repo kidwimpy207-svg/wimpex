@@ -3,12 +3,12 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { sendVerificationEmail, generateToken } = require('../services/email');
-const { store, saveUsers } = require('../services/store');
+const { state, save } = require('../services/store');
 
 // Send verification email (on signup or request)
 router.post('/send-verification', authenticateToken, async (req, res) => {
   try {
-    const user = store.users.find((u) => u.userId === req.user.userId);
+    const user = state.users[req.user.userId];
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -17,13 +17,11 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Email already verified' });
     }
 
-    // Generate token
     const token = generateToken();
     user.emailVerificationToken = token;
-    user.emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    saveUsers();
+    user.emailVerificationExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    save.users();
 
-    // Send email
     const result = await sendVerificationEmail(user.email, user.username, token);
     if (!result.success) {
       return res.status(500).json({ error: result.message || result.error });
@@ -45,8 +43,8 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Token required' });
     }
 
-    const user = store.users.find(
-      (u) => u.emailVerificationToken === token && new Date() < u.emailVerificationExpiry
+    const user = Object.values(state.users).find(
+      (u) => u.emailVerificationToken === token && Date.now() < (u.emailVerificationExpiry || 0)
     );
 
     if (!user) {
@@ -56,7 +54,7 @@ router.post('/verify', async (req, res) => {
     user.emailConfirmed = true;
     user.emailVerificationToken = null;
     user.emailVerificationExpiry = null;
-    saveUsers();
+    save.users();
 
     res.json({ success: true, message: 'Email verified' });
   } catch (err) {
@@ -68,7 +66,7 @@ router.post('/verify', async (req, res) => {
 // Resend verification email
 router.post('/resend-verification', authenticateToken, async (req, res) => {
   try {
-    const user = store.users.find((u) => u.userId === req.user.userId);
+    const user = state.users[req.user.userId];
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -78,16 +76,16 @@ router.post('/resend-verification', authenticateToken, async (req, res) => {
     }
 
     // Rate limit: only resend every 60 seconds
-    const lastResend = user.lastVerificationResend ? new Date(user.lastVerificationResend) : null;
-    if (lastResend && Date.now() - lastResend < 60000) {
+    const lastResend = user.lastVerificationResend ? user.lastVerificationResend : null;
+    if (lastResend && Date.now() - new Date(lastResend).getTime() < 60000) {
       return res.status(429).json({ error: 'Too many resend attempts, try again later' });
     }
 
     const token = generateToken();
     user.emailVerificationToken = token;
-    user.emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    user.lastVerificationResend = new Date();
-    saveUsers();
+    user.emailVerificationExpiry = Date.now() + 24 * 60 * 60 * 1000;
+    user.lastVerificationResend = new Date().toISOString();
+    save.users();
 
     const result = await sendVerificationEmail(user.email, user.username, token);
     if (!result.success) {

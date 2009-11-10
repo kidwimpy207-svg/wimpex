@@ -7,7 +7,7 @@ const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const config = require('../config');
 const { state, save } = require('../services/store');
-const { sendEmail } = require('../services/email'); // Need to extract email service too
+const { sendVerificationEmail, generateToken, sendWelcomeEmail } = require('../services/email');
 const { authenticateToken } = require('../middleware/auth'); // Need to extract middleware
 
 // Password helpers
@@ -40,40 +40,80 @@ router.post('/signup', (req, res) => {
     const userId = genId();
     const hashedPassword = hashPassword(password);
     const avatar = `https://i.pravatar.cc/150?img=${Math.random() * 70 | 0}`;
-    const confirmToken = crypto.randomBytes(32).toString('hex');
+        const confirmToken = generateToken();
 
-    state.users[userId] = {
-        userId,
-        username,
-        email,
-        phone: phone || '',
-        password: hashedPassword,
-        avatar,
-        bio: 'New to Wimpex ✨',
-        gender: gender || 'not-specified',
-        emailConfirmed: false,
-        confirmToken: confirmToken,
-        friends: [],
-        followers: [],
-        createdAt: Date.now()
-    };
+        state.users[userId] = {
+                userId,
+                username,
+                email,
+                phone: phone || '',
+                password: hashedPassword,
+                avatar,
+                bio: 'New to Wimpex ✨',
+                gender: gender || 'not-specified',
+                emailConfirmed: false,
+                emailVerificationToken: confirmToken,
+                emailVerificationExpiry: Date.now() + 24 * 60 * 60 * 1000,
+                friends: [],
+                followers: [],
+                createdAt: Date.now()
+        };
 
+        save.users();
+
+        // Send verification email (best-effort)
+        (async () => {
+            try {
+                await sendVerificationEmail(email, username, confirmToken);
+                // Optionally send welcome email later after verification
+            } catch (e) {
+                console.warn('Failed to send verification email:', e && e.message ? e.message : e);
+            }
+        })();
+
+        const token = jwt.sign({ userId, username }, config.jwt.secret, { expiresIn: config.jwt.expiry });
+        res.json({
+                userId,
+                username,
+                avatar,
+                token,
+                message: 'Account created! Please check your email to confirm.'
+        });
+});
+
+// Verify email token
+router.post('/verify', (req, res) => {
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ error: 'token required' });
+    const user = Object.values(state.users).find(u => u.emailVerificationToken === token);
+    if (!user) return res.status(400).json({ error: 'Invalid token' });
+    if (user.emailVerificationExpiry && Date.now() > user.emailVerificationExpiry) return res.status(400).json({ error: 'Token expired' });
+    user.emailConfirmed = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpiry = null;
     save.users();
+    // send welcome email (best-effort)
+    (async () => {
+        try { await sendWelcomeEmail(user.email, user.username); } catch (e) { /* ignore */ }
+    })();
+    res.json({ ok: true, message: 'Email verified' });
+});
 
-    const confirmUrl = `${config.apiPrefix || ''}/auth/confirm?token=${confirmToken}`; // Adjust URL as reusable
-    // Ideally base URL should be in config
-    // For now using placeholder logic
-
-    // Note: sendEmail is assumed imported. I should implement it.
-
-    const token = jwt.sign({ userId, username }, config.jwt.secret, { expiresIn: config.jwt.expiry });
-    res.json({
-        userId,
-        username,
-        avatar,
-        token,
-        message: 'Account created! Please check your email to confirm.'
-    });
+// Resend verification email
+router.post('/verify/resend', (req, res) => {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ error: 'email required' });
+    const user = Object.values(state.users).find(u => u.email === email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.emailConfirmed) return res.status(400).json({ error: 'Email already verified' });
+    const newToken = generateToken();
+    user.emailVerificationToken = newToken;
+    user.emailVerificationExpiry = Date.now() + 24 * 60 * 60 * 1000;
+    save.users();
+    (async () => {
+        try { await sendVerificationEmail(user.email, user.username, newToken); } catch (e) { console.warn('Resend verification failed', e && e.message ? e.message : e); }
+    })();
+    res.json({ ok: true, message: 'Verification email resent' });
 });
 
 // Login

@@ -36,4 +36,10 @@ app.use(config.apiPrefix || '/api', routes);
 app.use(express.static(path.join(__dirname, '../client')));
 app.use('/media', express.static(MEDIA_DIR));
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('[Error]', err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+});
+
 module.exports = app;

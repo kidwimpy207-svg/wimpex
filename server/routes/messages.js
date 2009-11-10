@@ -7,44 +7,202 @@ const { sendPush } = require('../services/notification');
 
 function genId() { return crypto.randomBytes(6).toString('hex'); }
 
-router.get('/:userId', authenticateToken, (req, res) => {
-    const convoId = [req.user.userId, req.params.userId].sort().join('-');
-    const convoMessages = state.messages[convoId] || [];
-    res.json(convoMessages);
+// Initialize groups in state if not present
+if (!state.groups) state.groups = {};
+
+// Get messages from conversation (1:1 or group)
+router.get('/:conversationId', authenticateToken, (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        // If a plain user id was provided, treat as 1:1 chat and compute conversation id
+        let convoId = conversationId;
+        if (!String(conversationId).startsWith('group-')) {
+            convoId = [req.user.userId, conversationId].sort().join('-');
+        }
+        const convoMessages = state.messages[convoId] || [];
+        res.json(convoMessages);
+    } catch (e) {
+        console.error('[Messages GET] Error:', e);
+        res.status(500).json({ error: 'Failed to fetch messages' });
+    }
 });
 
+// Post a message to conversation (1:1 or group)
+// Supports message `type`: 'text' (default), 'emoji', 'sticker', 'audio'
+// For 'text' use `text`; for other types use `content` (e.g. sticker id or audio URL)
 router.post('/', authenticateToken, (req, res) => {
-    const { toId, text } = req.body;
-    if (!toId || !text) return res.status(400).json({ error: 'Missing fields' });
+    try {
+        const { toId, groupId, text, type = 'text', content } = req.body;
 
-    const convoId = [req.user.userId, toId].sort().join('-');
-    if (!state.messages[convoId]) state.messages[convoId] = [];
+        if (type === 'text' && !text) return res.status(400).json({ error: 'Text required for text messages' });
+        if (type !== 'text' && !content) return res.status(400).json({ error: 'Content required for non-text messages' });
 
-    const msg = {
-        id: genId(),
-        from: req.user.userId,
-        to: toId,
-        text,
-        timestamp: Date.now(),
-        read: false
-    };
-    state.messages[convoId].push(msg);
-    save.messages();
+        let convoId;
+        let recipients = [];
 
-    // Send push
-    const fromUser = state.users[req.user.userId];
-    sendPush(toId, {
-        title: `${fromUser?.username || 'Someone'} sent a message`,
-        body: text.slice(0, 120),
-        url: '/',
-        actions: [{ action: 'view', title: 'Open' }]
-    }).catch(console.error);
+        if (groupId) {
+            // Group message
+            const group = state.groups[groupId];
+            if (!group) return res.status(404).json({ error: 'Group not found' });
+            if (!group.members.includes(req.user.userId)) {
+                return res.status(403).json({ error: 'Not a member of this group' });
+            }
+            convoId = `group-${groupId}`;
+            recipients = group.members.filter(id => id !== req.user.userId);
+        } else if (toId) {
+            // 1:1 message
+            convoId = [req.user.userId, toId].sort().join('-');
+            recipients = [toId];
+        } else {
+            return res.status(400).json({ error: 'toId or groupId required' });
+        }
 
-    // Todo: Realtime WS notification via event bus
+        if (!state.messages[convoId]) state.messages[convoId] = [];
+
+        const msg = {
+            id: genId(),
+            from: req.user.userId,
+            fromUsername: state.users[req.user.userId]?.username,
+            type,
+            content: type === 'text' ? text : content,
+            timestamp: Date.now(),
+            readBy: [req.user.userId]
+        };
+
+        state.messages[convoId].push(msg);
+        save.messages();
+
+        // Build preview for push notifications
+        let preview = '';
+        if (type === 'text') preview = (text || '').slice(0, 120);
+        else if (type === 'emoji') preview = content;
+        else if (type === 'sticker') preview = 'Sent a sticker';
+        else if (type === 'audio') preview = 'Sent a voice message';
+        else preview = 'New message';
+
+        // Send push to all recipients
+        const fromUser = state.users[req.user.userId];
+        recipients.forEach(recipientId => {
+            sendPush(recipientId, {
+                title: `${fromUser?.username || 'Someone'} sent a message`,
+            body: preview,
+            url: '/',
+            actions: [{ action: 'view', title: 'Open' }]
+        }).catch(console.error);
+    });
 
     res.json(msg);
+    } catch (e) {
+        console.error('[Messages POST] Error:', e.message, e.stack);
+        res.status(500).json({ error: 'Failed to send message' });
+    }
 });
 
+// Mark messages as read
+router.post('/read', authenticateToken, (req, res) => {
+    try {
+        console.log('[Messages Read] Received request:', { userId: req.user?.userId, body: req.body });
+        
+        const { messageIds, conversationId } = req.body;
+        if (!Array.isArray(messageIds) || !conversationId) {
+            return res.status(400).json({ error: 'messageIds array and conversationId required' });
+        }
+
+        const msgs = state.messages[conversationId] || [];
+        console.log('[Messages Read] Found', msgs.length, 'messages in conversation', conversationId);
+        
+        let updated = 0;
+        msgs.forEach(m => {
+            if (!m.readBy) m.readBy = [];
+            if (messageIds.includes(m.id) && !m.readBy.includes(req.user.userId)) {
+                m.readBy.push(req.user.userId);
+                updated++;
+            }
+        });
+
+        if (updated > 0) {
+            save.messages();
+            console.log('[Messages Read] Updated', updated, 'messages');
+        }
+        res.json({ ok: true, updated });
+    } catch (e) {
+        console.error('[Messages READ] Error:', e.message, e.stack);
+        res.status(500).json({ error: 'Failed to mark messages as read' });
+    }
+});
+
+// Create a group
+router.post('/groups', authenticateToken, (req, res) => {
+    const { name, memberIds } = req.body;
+    if (!name) return res.status(400).json({ error: 'Group name required' });
+
+    const groupId = genId();
+    const members = [req.user.userId];
+    if (Array.isArray(memberIds)) {
+        members.push(...memberIds.filter(id => !members.includes(id)));
+    }
+
+    state.groups[groupId] = {
+        groupId,
+        name,
+        createdBy: req.user.userId,
+        createdAt: Date.now(),
+        members,
+        avatar: `https://i.pravatar.cc/150?u=${groupId}`
+    };
+
+    save.groups?.() || null; // Save if save.groups exists
+
+    res.json({ ok: true, groupId, group: state.groups[groupId] });
+});
+
+// Get user's groups
+router.get('/user/groups', authenticateToken, (req, res) => {
+    const userId = req.user.userId;
+    const userGroups = Object.values(state.groups || {})
+        .filter(g => g.members.includes(userId))
+        .map(g => ({
+            groupId: g.groupId,
+            name: g.name,
+            avatar: g.avatar,
+            memberCount: g.members.length
+        }));
+
+    res.json(userGroups);
+});
+
+// Get group details
+router.get('/groups/:groupId', authenticateToken, (req, res) => {
+    const group = state.groups?.[req.params.groupId];
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    if (!group.members.includes(req.user.userId)) {
+        return res.status(403).json({ error: 'Not a member of this group' });
+    }
+
+    res.json(group);
+});
+
+// Add member to group
+router.post('/groups/:groupId/members', authenticateToken, (req, res) => {
+    const { groupId } = req.params;
+    const { userId } = req.body;
+    const group = state.groups?.[groupId];
+
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (!group.members.includes(req.user.userId)) {
+        return res.status(403).json({ error: 'Not a member of this group' });
+    }
+
+    if (!group.members.includes(userId)) {
+        group.members.push(userId);
+        save.groups?.() || null;
+    }
+
+    res.json({ ok: true });
+});
+
+// Acknowledge messages (legacy endpoint)
 router.post('/ack', authenticateToken, (req, res) => {
     const { ids } = req.body;
     if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
@@ -58,6 +216,7 @@ router.post('/ack', authenticateToken, (req, res) => {
     res.json({ ok: true, updated });
 });
 
+// Sync messages
 router.get('/sync', authenticateToken, (req, res) => {
     const uid = req.user.userId;
     const undelivered = [];

@@ -10,6 +10,10 @@ if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const STORIES_FILE = path.join(DATA_DIR, 'stories.json');
 const SNAPS_FILE = path.join(DATA_DIR, 'snaps.json');
+const WIMPY_FILE = path.join(DATA_DIR, 'wimpy_conversations.json');
+const STREAKS_FILE = path.join(DATA_DIR, 'streaks.json');
+const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
+const IMAGES_FILE = path.join(DATA_DIR, 'images.json');
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const PUSH_FILE = path.join(DATA_DIR, 'push_subscriptions.json');
 const MODERATION_FILE = path.join(DATA_DIR, 'moderation_queue.json');
@@ -40,6 +44,10 @@ const state = {
     users: loadData(USERS_FILE, {}),
     stories: loadData(STORIES_FILE, {}),
     snaps: loadData(SNAPS_FILE, {}),
+    wimpyConversations: loadData(WIMPY_FILE, {}),
+    streaks: loadData(STREAKS_FILE, {}),
+    scores: loadData(SCORES_FILE, {}),
+    images: loadData(IMAGES_FILE, {}),
     moderationQueue: loadData(MODERATION_FILE, []),
     messages: loadData(MESSAGES_FILE, {}),
     pushSubscriptions: loadData(PUSH_FILE, {}),
@@ -54,6 +62,10 @@ const save = {
     users: () => saveData(USERS_FILE, state.users),
     stories: () => saveData(STORIES_FILE, state.stories),
     snaps: () => saveData(SNAPS_FILE, state.snaps),
+    wimpyConversations: () => saveData(WIMPY_FILE, state.wimpyConversations),
+    streaks: () => saveData(STREAKS_FILE, state.streaks),
+    scores: () => saveData(SCORES_FILE, state.scores),
+    images: () => saveData(IMAGES_FILE, state.images),
     moderationQueue: () => saveData(MODERATION_FILE, state.moderationQueue),
     messages: () => saveData(MESSAGES_FILE, state.messages),
     pushSubscriptions: () => saveData(PUSH_FILE, state.pushSubscriptions),

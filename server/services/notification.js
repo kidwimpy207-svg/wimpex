@@ -6,8 +6,9 @@ const { state, save } = require('./store');
 // Init WebPush — tolerate invalid/malformed VAPID keys
 if (config.vapid && config.vapid.publicKey && config.vapid.privateKey) {
     try {
+        const emailFrom = (config.smtp && config.smtp.from) ? `mailto:${config.smtp.from}` : 'mailto:admin@example.com';
         webpush.setVapidDetails(
-            config.email.from ? `mailto:${config.email.from}` : 'mailto:admin@example.com',
+            emailFrom,
             config.vapid.publicKey,
             config.vapid.privateKey
         );

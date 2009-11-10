@@ -80,4 +80,76 @@ router.get('/recommendations', authenticateToken, (req, res) => {
     res.json(potential);
 });
 
+// Get pending friend requests for current user
+router.get('/requests/pending', authenticateToken, (req, res) => {
+    const user = state.users[req.user.userId];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const requests = user.friendRequests || [];
+    res.json(requests);
+});
+
+// Send a friend request
+router.post('/requests/send', authenticateToken, (req, res) => {
+    const { targetId } = req.body;
+    const user = state.users[req.user.userId];
+    const targetUser = state.users[targetId];
+
+    if (!targetUser) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: 'Current user not found' });
+    
+    if (user.friends && user.friends.includes(targetId)) {
+        return res.status(400).json({ error: 'Already friends' });
+    }
+
+    if (!targetUser.friendRequests) targetUser.friendRequests = [];
+    if (targetUser.friendRequests.some(r => r.fromUserId === user.userId)) {
+        return res.status(400).json({ error: 'Request already sent' });
+    }
+
+    targetUser.friendRequests.push({
+        fromUserId: user.userId,
+        fromUsername: user.username,
+        fromAvatar: user.avatar,
+        createdAt: Date.now()
+    });
+
+    save.users();
+    res.json({ ok: true, message: 'Friend request sent' });
+});
+
+// Accept a friend request
+router.post('/requests/accept', authenticateToken, (req, res) => {
+    const { fromUserId } = req.body;
+    const user = state.users[req.user.userId];
+    const fromUser = state.users[fromUserId];
+
+    if (!user || !fromUser) return res.status(404).json({ error: 'User not found' });
+
+    if (!user.friendRequests) user.friendRequests = [];
+    user.friendRequests = user.friendRequests.filter(r => r.fromUserId !== fromUserId);
+
+    if (!user.friends) user.friends = [];
+    if (!fromUser.friends) fromUser.friends = [];
+
+    if (!user.friends.includes(fromUserId)) user.friends.push(fromUserId);
+    if (!fromUser.friends.includes(user.userId)) fromUser.friends.push(user.userId);
+
+    save.users();
+    res.json({ ok: true, message: 'Request accepted' });
+});
+
+// Decline a friend request
+router.post('/requests/decline', authenticateToken, (req, res) => {
+    const { fromUserId } = req.body;
+    const user = state.users[req.user.userId];
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (!user.friendRequests) user.friendRequests = [];
+    user.friendRequests = user.friendRequests.filter(r => r.fromUserId !== fromUserId);
+
+    save.users();
+    res.json({ ok: true, message: 'Request declined' });
+});
+
 module.exports = router;

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: wimpex-app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      API_PREFIX: /api
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_key}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    volumes:
+      - ./server:/app/server
+      - ./client:/app/client
+      - ./data:/app/data
+    depends_on:
+      - redis
+    networks:
+      - wimpex
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: wimpex-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - wimpex
+    restart: unless-stopped
+
+  # Optional: MailHog for testing emails
+  mailhog:
+    image: mailhog/mailhog
+    container_name: wimpex-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - wimpex
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  wimpex:
+    driver: bridge

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wimpex Chat Demo — Dark Theme</title>
+  <link rel="stylesheet" href="chat_demo.css">
+</head>
+<body>
+  <div class="chat-app">
+    <header class="chat-header">
+      <button class="back-btn" aria-label="Back">← Back</button>
+      <div class="chat-title">
+        <div class="title-line">
+          <span class="name">wimpy</span>
+          <span class="streak">🔥 3</span>
+        </div>
+        <div class="progress-wrap" aria-hidden="true">
+          <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn menu">⋮</button>
+        <button class="icon-btn pin" aria-pressed="false">📌</button>
+      </div>
+    </header>
+
+    <main class="chat-main" id="chatMain">
+      <div class="messages" id="messages" role="log" aria-live="polite"></div>
+    </main>
+
+    <footer class="chat-footer">
+      <div class="media-actions">
+        <button class="media-btn" id="photoBtn" title="Photo">📷</button>
+        <button class="media-btn" id="attachBtn" title="Attach">📎</button>
+        <button class="media-btn" id="videoBtn" title="Video">🎥</button>
+        <button class="media-btn" id="aiBtn" title="Generate (AI)">🤖</button>
+      </div>
+      <div class="input-wrap">
+        <textarea id="messageInput" placeholder="Type a message..." rows="1" aria-label="Type a message"></textarea>
+      </div>
+      <div class="send-wrap">
+        <button class="send-btn" id="sendBtn" title="Send">✈️</button>
+      </div>
+    </footer>
+
+    <!-- Hidden inputs for media picker demo -->
+    <input id="photoInput" type="file" accept="image/*" style="display:none">
+    <input id="fileInput" type="file" accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
+    <input id="videoInput" type="file" accept="video/*" style="display:none">
+
+  <script src="chat_demo.js"></script>
+</body>
+</html>

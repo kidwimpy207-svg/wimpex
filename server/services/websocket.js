@@ -39,7 +39,13 @@ function handleConnection(ws) {
         if (!userId) return;
 
         if (type === 'message') {
-            const { toId, text } = msg;
+            const { toId } = msg;
+            const clientId = msg.clientId; // optional client-side id for reconciliation
+            // Accept both plain text or structured message payloads
+            const incoming = msg.message || {};
+            const content = msg.text || incoming.content || incoming.text || '';
+            const msgType = incoming.type || (msg.type === 'message' ? 'text' : incoming.type) || 'text';
+
             // Persist message
             const convoId = [userId, toId].sort().join('-');
             if (!state.messages[convoId]) state.messages[convoId] = [];
@@ -47,7 +53,8 @@ function handleConnection(ws) {
                 id: require('crypto').randomBytes(6).toString('hex'),
                 from: userId,
                 to: toId,
-                text,
+                type: msgType,
+                content,
                 timestamp: Date.now(),
                 read: false
             };
@@ -57,11 +64,12 @@ function handleConnection(ws) {
             // Forward to recipient
             const targetWs = connections.get(toId);
             if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-                targetWs.send(JSON.stringify({ type: 'new-message', message: m }));
+                // include clientId if provided so recipient can correlate if needed
+                targetWs.send(JSON.stringify({ type: 'new-message', message: m, clientId }));
             }
 
-            // Ack sender
-            ws.send(JSON.stringify({ type: 'delivered', id: m.id, to: toId, ts: Date.now() }));
+            // Ack sender: reply with server id and also echo clientId so client can reconcile optimistic UI
+            ws.send(JSON.stringify({ type: 'delivered', id: m.id, to: toId, ts: Date.now(), clientId }));
             return;
         }
 
@@ -83,8 +91,33 @@ function handleConnection(ws) {
             return;
         }
 
+        // Read receipts: client notifies that one or more message ids were read
+        if (type === 'read') {
+            const { ids, toId } = msg; // toId is the original sender of the messages
+            let readIds = ids;
+            if (!Array.isArray(readIds)) readIds = [readIds];
+            // mark messages as read in state (best-effort)
+            try {
+                const convoId = [userId, toId].sort().join('-');
+                const msgs = state.messages[convoId] || [];
+                readIds.forEach(rid => {
+                    const mm = msgs.find(x => x.id === rid);
+                    if (mm) mm.read = true;
+                });
+                save.messages();
+            } catch (e) { /* ignore */ }
+
+            // notify original sender that these messages were read
+            const senderWs = connections.get(toId);
+            if (senderWs && senderWs.readyState === WebSocket.OPEN) {
+                senderWs.send(JSON.stringify({ type: 'read', ids: readIds, from: userId, ts: Date.now() }));
+            }
+
+            return;
+        }
+
         // Note: signal (WebRTC) and snap-sent logic also goes here
-        if (type === 'snap-sent') {
+        if (msg.type === 'snap-sent') {
             const { toId } = msg;
             const targetWs = connections.get(toId);
             if (targetWs && targetWs.readyState === WebSocket.OPEN) {
@@ -93,6 +126,21 @@ function handleConnection(ws) {
                     from: userId,
                     fromUsername: state.users[userId]?.username || 'Unknown'
                 }));
+            }
+            // renew streak for both participants
+            try {
+                const streaks = require('./streaks');
+                streaks.renewStreak(userId, toId);
+                streaks.renewStreak(toId, userId);
+            } catch (e) { /* best-effort */ }
+        }
+
+        // WebRTC signaling
+        if (type === 'call-offer' || type === 'call-answer' || type === 'ice-candidate' || type === 'call-reject') {
+            const { toId } = msg;
+            const targetWs = connections.get(toId);
+            if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                targetWs.send(JSON.stringify({ ...msg, from: userId }));
             }
         }
 
