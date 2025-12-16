@@ -390,12 +390,12 @@
     topbar.style.display = 'none';
     mainContainer.style.display = 'none';
     conversations.clear();
-    document.getElementById('loginEmail').value = '';
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('signupUsername').value = '';
-    document.getElementById('signupEmail').value = '';
-    document.getElementById('signupPassword').value = '';
-    document.getElementById('signupConfirm').value = '';
+    const le = document.getElementById('loginEmail'); if (le) le.value = '';
+    const lp = document.getElementById('loginPassword'); if (lp) lp.value = '';
+    const su = document.getElementById('signupUsername'); if (su) su.value = '';
+    const se = document.getElementById('signupEmail'); if (se) se.value = '';
+    const sp = document.getElementById('signupPassword'); if (sp) sp.value = '';
+    const sc = document.getElementById('signupConfirm'); if (sc) sc.value = '';
   });
 
   // ===== WEBSOCKET =====
@@ -575,8 +575,17 @@
     if (!reg) return;
     // ask server for VAPID public key
     const pkRes = await fetch('/api/push/publicKey');
+    if (!pkRes.ok) {
+      console.error('Failed to get VAPID public key', pkRes.status);
+      alert('Push not available: server did not provide a public key');
+      return;
+    }
     const pkJson = await pkRes.json();
     const publicKey = pkJson.publicKey;
+    if (!publicKey) {
+      alert('Push not available: public key missing');
+      return;
+    }
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
     // send to server
     await fetch('/api/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${currentToken}` }, body: JSON.stringify({ subscription: sub }) });
@@ -673,6 +682,11 @@
       });
       const stories = await res.json();
       storiesGrid.innerHTML = '';
+
+      if (!Array.isArray(stories)) {
+        console.error('Stories response is not an array', stories);
+        return;
+      }
 
       stories.forEach(story => {
         const card = document.createElement('div');
@@ -1291,6 +1305,125 @@
       settingsStatus.classList.remove('hidden');
     } else {
       settingsStatus.classList.add('hidden');
+    }
+  }
+
+  // ===== UPLOAD & MEDIA =====
+  async function uploadFile(file) {
+    try {
+      // Get presigned URL from server
+      const presignedRes = await fetch(`${API_PREFIX}/upload/presigned`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type
+        })
+      });
+
+      if (!presignedRes.ok) {
+        throw new Error('Failed to get presigned URL');
+      }
+
+      const { presignedUrl, cdnUrl } = await presignedRes.json();
+
+      // Upload directly to S3
+      const uploadRes = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Upload failed');
+      }
+
+      return { success: true, cdnUrl };
+    } catch (err) {
+      console.error('Upload error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // ===== PAYMENTS =====
+  async function loadPaymentPlans() {
+    try {
+      const res = await fetch(`${API_PREFIX}/payments/plans`);
+      if (!res.ok) throw new Error('Failed to load plans');
+      const plans = await res.json();
+      return plans;
+    } catch (err) {
+      console.error('Load plans error:', err);
+      return [];
+    }
+  }
+
+  async function subscribeToplan(planId) {
+    try {
+      const res = await fetch(`${API_PREFIX}/payments/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({ planId })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Subscription failed');
+      }
+
+      const { clientSecret } = await res.json();
+      return { success: true, clientSecret };
+    } catch (err) {
+      console.error('Subscribe error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // ===== EMAIL VERIFICATION =====
+  async function sendVerificationEmail() {
+    try {
+      const res = await fetch(`${API_PREFIX}/email/send-verification`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${currentToken}`
+        }
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to send verification email');
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Verification email error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function verifyEmail(token) {
+    try {
+      const res = await fetch(`${API_PREFIX}/email/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Verification failed');
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Email verify error:', err);
+      return { success: false, error: err.message };
     }
   }
 

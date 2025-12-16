@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#main" style="position:absolute;left:-999px;top:auto;width:1px;height:1px;overflow:hidden;">Skip to content</a>
   <!-- Auth Modals -->
   <div id="authContainer" class="auth-container">
     <div class="auth-card">
@@ -83,6 +84,9 @@
   <!-- Top Navigation -->
   <nav class="topbar hidden">
     <div class="logo">✨ Wimpex</div>
+    <form id="searchForm" class="search-form" style="display:inline-block;margin-left:12px;">
+      <input id="searchInput" type="search" placeholder="Search users or tags" aria-label="Search" style="padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#fff;" />
+    </form>
     <div class="nav-actions">
       <button id="storiesBtn" class="nav-btn" title="Stories">📖</button>
       <button id="chatsBtn" class="nav-btn active" title="Messages">💬</button>
@@ -345,6 +349,58 @@
         <button type="submit" class="gold-btn">Add Friend</button>
       </form>
       <div id="friendsList" class="friends-list"></div>
+      <button class="close-modal-btn">Close</button>
+    </div>
+  </div>
+
+  <!-- Privacy & Compliance Modals -->
+  <div id="privacyModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>🔒 Privacy Controls</h2>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <button id="blockUserBtn" class="gold-btn">🚫 Block Users</button>
+        <button id="muteUserBtn" class="gold-btn">🔇 Mute Users</button>
+        <button id="reportUserBtn" class="gold-btn">⚠️ Report</button>
+        <button id="exportDataBtn" class="gold-btn">📥 Export My Data (GDPR)</button>
+        <button id="deleteAccountBtn" class="gold-btn" style="background:#c00;border:none;color:#fff;">🗑️ Delete My Account</button>
+        <button class="close-modal-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notificationsPrefsModal" class="modal hidden">
+    <div class="modal-content" style="max-width:480px;">
+      <h2>🔔 Notification Preferences</h2>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input id="dndToggle" type="checkbox"> Do Not Disturb (all notifications muted)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input id="batchingToggle" type="checkbox"> Batch notifications (send hourly digest)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input id="snapNotifToggle" type="checkbox" checked> Snaps
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input id="msgNotifToggle" type="checkbox" checked> Messages
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input id="friendNotifToggle" type="checkbox" checked> Friend requests
+        </label>
+        <button id="savePrefsBtn" class="gold-btn">Save Preferences</button>
+        <button class="close-modal-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="complianceModal" class="modal hidden">
+    <div class="modal-content" style="max-width:600px;max-height:80vh;overflow-y:auto;">
+      <h2>📋 Legal & Compliance</h2>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button id="privacyPolicyBtn" class="gold-btn">Privacy Policy</button>
+        <button id="termsBtn" class="gold-btn">Terms of Service</button>
+      </div>
+      <div id="complianceContent" style="border:1px solid rgba(212,175,55,0.2);padding:12px;border-radius:6px;font-size:13px;line-height:1.6;white-space:pre-wrap;"></div>
       <button class="close-modal-btn">Close</button>
     </div>
   </div>

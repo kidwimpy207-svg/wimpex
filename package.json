@@ -1,0 +1,13 @@
+{
+  "name": "wimpex",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "start:dev": "node server/index.js",
+    "test": "echo \"No tests configured\" && exit 0"
+  },
+  "dependencies": {
+    "nodemailer": "^7.0.11"
+  }
+}

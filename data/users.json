@@ -9,5 +9,37 @@
     "friends": [],
     "followers": [],
     "createdAt": 1764692891436
+  },
+  "0335e2c7fee2": {
+    "userId": "0335e2c7fee2",
+    "username": "curltest",
+    "email": "curltest@example.com",
+    "phone": "",
+    "password": "$2a$10$CaXZb7bz17qZb4XOCtTFBuHqLvvaMots1Uxgu0Zizqyr0Px4KDCJS",
+    "avatar": "https://i.pravatar.cc/150?img=30",
+    "bio": "New to Wimpex ✨",
+    "gender": "other",
+    "emailConfirmed": false,
+    "confirmToken": "8c105809be71b0a08a9b9077bbe2fac650e9e4dcce1e448c1116c5ecfff6f1ea",
+    "friends": [],
+    "followers": [],
+    "createdAt": 1765302244798
+  },
+  "79d0bfc01d79": {
+    "userId": "79d0bfc01d79",
+    "username": "davzee999",
+    "email": "lionelmichael116@gmail.com",
+    "phone": "08103739144",
+    "password": "$2a$10$E1iOSsaP.UUJG1P/Owr9y.W4Bacc0e8QE1M/raBn/8nV51vRUY1mO",
+    "avatar": "https://i.pravatar.cc/150?img=49",
+    "bio": "New to Wimpex ✨",
+    "gender": "male",
+    "emailConfirmed": false,
+    "confirmToken": "dc5484231f411c472e670bc0ca698a588148d0e7ef475704a8a3c80663ac5f7b",
+    "friends": [],
+    "followers": [],
+    "createdAt": 1765302505136,
+    "onboardingComplete": true,
+    "onboardedAt": 1765304258984
   }
 }

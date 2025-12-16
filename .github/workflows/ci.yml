@@ -1,0 +1,101 @@
+name: CI / E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      # Optional: add a database service if needed
+      # db:
+      #   image: postgres:14
+      #   env:
+      #     POSTGRES_PASSWORD: postgres
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'server/package.json'
+
+    - name: Install dependencies
+      working-directory: ./server
+      run: npm install
+
+    - name: Start server
+      working-directory: ./server
+      run: |
+        node index.js &
+        sleep 3
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test_secret_key
+        BASE_URL: http://localhost:3000
+
+    - name: Run E2E upload tests
+      working-directory: ./server
+      run: npm run test:e2e
+      timeout-minutes: 5
+
+    - name: Run unit tests (if available)
+      working-directory: ./server
+      run: npm test
+      continue-on-error: true
+
+    - name: Check server logs on failure
+      if: failure()
+      run: |
+        echo "Server still running tests or crashed. Check logs above."
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Check for obvious syntax errors
+      run: |
+        node -c server/index.js
+        if [ -f client/app.js ]; then node -c client/app.js; fi
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      working-directory: ./server
+      run: npm install --only=production
+
+    - name: Run npm audit
+      working-directory: ./server
+      run: npm audit --audit-level=high
+      continue-on-error: true
+
+    - name: Check for hardcoded secrets
+      run: |
+        if grep -r "PRIVATE_KEY\|SECRET_KEY\|API_KEY\|PASSWORD" server/index.js | grep -v "process.env"; then
+          echo "⚠️  Warning: Possible hardcoded secrets found in server/index.js"
+        fi

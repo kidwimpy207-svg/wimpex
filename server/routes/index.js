@@ -1,0 +1,42 @@
+const express = require('express');
+const router = express.Router();
+
+const authRoutes = require('./auth');
+const userRoutes = require('./users');
+const contentRoutes = require('./content');
+const messageRoutes = require('./messages');
+const friendRoutes = require('./friends');
+const searchRoutes = require('./search');
+const moderationRoutes = require('./moderation');
+const pushRoutes = require('./push');
+const settingsRoutes = require('./settings');
+const recommendationsRoutes = require('./recommendations');
+const onboardingRoutes = require('./onboarding');
+const complianceRoutes = require('./compliance');
+const sessionRoutes = require('./sessions');
+const billingRoutes = require('./billing');
+const trustRoutes = require('./trust');
+const paymentsRoutes = require('./payments');
+const uploadRoutes = require('./upload');
+const emailRoutes = require('./email');
+
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/', contentRoutes);
+router.use('/messages', messageRoutes);
+router.use('/friends', friendRoutes);
+router.use('/search', searchRoutes);
+router.use('/moderation', moderationRoutes);
+router.use('/push', pushRoutes);
+router.use('/settings', settingsRoutes);
+router.use('/recommendations', recommendationsRoutes);
+router.use('/onboarding', onboardingRoutes);
+router.use('/compliance', complianceRoutes);
+router.use('/sessions', sessionRoutes);
+router.use('/billing', billingRoutes);
+router.use('/trust', trustRoutes);
+router.use('/payments', paymentsRoutes);
+router.use('/upload', uploadRoutes);
+router.use('/email', emailRoutes);
+
+module.exports = router;
