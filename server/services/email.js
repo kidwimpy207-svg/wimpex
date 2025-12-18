@@ -100,6 +100,11 @@ const templates = {
 const sendVerificationEmail = async (email, username, token) => {
   const verifyUrl = `${config.appUrl || 'http://localhost:3000'}/verify-email`;
   const template = templates.verifyEmail(username, token, verifyUrl);
+  // If transporter is not configured, return a debug response so devs can surface token to user
+  if (!transporter) {
+    console.log(`[EMAIL DEBUG] Verification token for ${email}: ${token}`);
+    return { success: true, debug: true, token };
+  }
   return sendEmail(email, template.subject, template.html, template.text);
 };
 

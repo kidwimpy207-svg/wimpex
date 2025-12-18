@@ -23,9 +23,12 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
     save.users();
 
     const result = await sendVerificationEmail(user.email, user.username, token);
-    if (!result.success) {
+    if (!result.success && !result.debug) {
       return res.status(500).json({ error: result.message || result.error });
     }
+
+    // If in debug mode (no SMTP), return the token so the client can surface it
+    if (result.debug) return res.json({ success: true, message: 'Verification email logged (debug)', token });
 
     res.json({ success: true, message: 'Verification email sent' });
   } catch (err) {
@@ -88,10 +91,10 @@ router.post('/resend-verification', authenticateToken, async (req, res) => {
     save.users();
 
     const result = await sendVerificationEmail(user.email, user.username, token);
-    if (!result.success) {
+    if (!result.success && !result.debug) {
       return res.status(500).json({ error: result.message || result.error });
     }
-
+    if (result.debug) return res.json({ success: true, message: 'Verification email logged (debug)', token });
     res.json({ success: true, message: 'Verification email resent' });
   } catch (err) {
     console.error('Resend verification error:', err);

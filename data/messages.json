@@ -775,7 +775,8 @@
       "type": "text",
       "content": "good you",
       "timestamp": 1765909712608,
-      "read": false
+      "read": false,
+      "readBy": []
     },
     {
       "id": "556d2e09dd9b",
@@ -785,7 +786,8 @@
       "content": "aiit thats nice",
       "timestamp": 1765909727367,
       "readBy": [
-        "4a88d397901e"
+        "4a88d397901e",
+        "79d0bfc01d79"
       ]
     },
     {
@@ -795,7 +797,10 @@
       "type": "text",
       "content": "aiit thats nice",
       "timestamp": 1765909727381,
-      "read": false
+      "read": false,
+      "readBy": [
+        "79d0bfc01d79"
+      ]
     },
     {
       "id": "6b0051f7e6aa",
@@ -815,7 +820,8 @@
       "type": "text",
       "content": "yh bro",
       "timestamp": 1765909745903,
-      "read": false
+      "read": false,
+      "readBy": []
     },
     {
       "id": "a40b202391af",
@@ -835,7 +841,8 @@
       "type": "audio",
       "content": "/media/1765909762973_6v2gzo_voice.webm.webm",
       "timestamp": 1765909763032,
-      "read": false
+      "read": false,
+      "readBy": []
     },
     {
       "id": "904c9f575964",
@@ -866,7 +873,8 @@
       "type": "audio",
       "content": "/media/1765909789895_ampqag_voice.webm.webm",
       "timestamp": 1765909790017,
-      "read": false
+      "read": false,
+      "readBy": []
     },
     {
       "id": "5d9287a4aed0",
@@ -875,7 +883,8 @@
       "type": "audio",
       "content": "/media/1765909789903_7pilwx_voice.webm.webm",
       "timestamp": 1765909790126,
-      "read": false
+      "read": false,
+      "readBy": []
     },
     {
       "id": "138e7683e28c",
@@ -895,7 +904,8 @@
       "type": "audio",
       "content": "/media/1765909790286_p8j4zj_voice.webm.webm",
       "timestamp": 1765909790747,
-      "read": false
+      "read": false,
+      "readBy": []
     }
   ],
   "6e4827b80b1c-79d0bfc01d79": [

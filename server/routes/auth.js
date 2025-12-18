@@ -30,7 +30,7 @@ function verifyPassword(password, hash) {
 function genId() { return crypto.randomBytes(6).toString('hex'); }
 
 // Signup
-router.post('/signup', (req, res) => {
+router.post('/signup', async (req, res) => {
     const { username, email, phone, password, gender } = req.body;
     if (!username || !email || !password || !gender) return res.status(400).json({ error: 'Missing required fields' });
     if (Object.values(state.users).some(u => u.email === email)) return res.status(400).json({ error: 'Email already registered' });
@@ -60,25 +60,24 @@ router.post('/signup', (req, res) => {
         };
 
         save.users();
+        console.log('[auth] signup:', { userId, username, email });
 
-        // Send verification email (best-effort)
-        (async () => {
-            try {
-                await sendVerificationEmail(email, username, confirmToken);
-                // Optionally send welcome email later after verification
-            } catch (e) {
-                console.warn('Failed to send verification email:', e && e.message ? e.message : e);
-            }
-        })();
+        // Send verification email (best-effort). Use promise chain so file can be parsed
+        // even if top-level/legacy await usage causes issues in some runtimes.
+        let emailResult = null;
+        try {
+            // fire-and-capture result when available
+            sendVerificationEmail(email, username, confirmToken)
+                .then(r => { emailResult = r; })
+                .catch(e => { console.warn('Failed to send verification email:', e && e.message ? e.message : e); });
+        } catch (e) {
+            console.warn('Failed to initiate verification email:', e && e.message ? e.message : e);
+        }
 
         const token = jwt.sign({ userId, username }, config.jwt.secret, { expiresIn: config.jwt.expiry });
-        res.json({
-                userId,
-                username,
-                avatar,
-                token,
-                message: 'Account created! Please check your email to confirm.'
-        });
+        const resp = { userId, username, avatar, token, message: 'Account created! Please check your email to confirm.' };
+        if (emailResult && emailResult.debug) resp.debugEmailToken = emailResult.token;
+        res.json(resp);
 });
 
 // Verify email token
@@ -93,9 +92,11 @@ router.post('/verify', (req, res) => {
     user.emailVerificationExpiry = null;
     save.users();
     // send welcome email (best-effort)
-    (async () => {
-        try { await sendWelcomeEmail(user.email, user.username); } catch (e) { /* ignore */ }
-    })();
+    // send welcome email (best-effort) — fire-and-forget
+    try {
+        const _ = require('../services/email').sendWelcomeEmail;
+        if (_) _.call(null, user.email, user.username).catch ? _.call(null, user.email, user.username).catch(() => {}) : Promise.resolve();
+    } catch (e) { /* ignore */ }
     res.json({ ok: true, message: 'Email verified' });
 });
 
@@ -110,15 +111,17 @@ router.post('/verify/resend', (req, res) => {
     user.emailVerificationToken = newToken;
     user.emailVerificationExpiry = Date.now() + 24 * 60 * 60 * 1000;
     save.users();
-    (async () => {
-        try { await sendVerificationEmail(user.email, user.username, newToken); } catch (e) { console.warn('Resend verification failed', e && e.message ? e.message : e); }
-    })();
+    // Fire-and-forget resend of verification email
+    try {
+        sendVerificationEmail(user.email, user.username, newToken).catch(e => { console.warn('Resend verification failed', e && e.message ? e.message : e); });
+    } catch (e) { console.warn('Resend verification init failed', e && e.message ? e.message : e); }
     res.json({ ok: true, message: 'Verification email resent' });
 });
 
 // Login
 router.post('/login', (req, res) => {
     const { input, password, loginType } = req.body;
+    console.log('[auth] login attempt', { input: input ? String(input).slice(0,40) : input, loginType });
     if (!input || !password) return res.status(400).json({ error: 'Input and password required' });
 
     let user = null;
@@ -132,8 +135,14 @@ router.post('/login', (req, res) => {
         user = Object.values(state.users).find(u => u.email === input || u.phone === input || u.username === input);
     }
 
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-    if (!verifyPassword(password, user.password)) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+        console.log('[auth] login failed - user not found for', input);
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    if (!verifyPassword(password, user.password)) {
+        console.log('[auth] login failed - bad password for', user.userId);
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
     if (user.twoFA && user.twoFA.enabled) {
         const temp = jwt.sign({ userId: user.userId, twofa: true }, config.jwt.secret, { expiresIn: '5m' });
@@ -141,6 +150,7 @@ router.post('/login', (req, res) => {
     }
 
     const token = jwt.sign({ userId: user.userId, username: user.username }, config.jwt.secret, { expiresIn: config.jwt.expiry });
+    console.log('[auth] login success', { userId: user.userId, username: user.username });
     res.json({ userId: user.userId, username: user.username, avatar: user.avatar, token });
 });
 

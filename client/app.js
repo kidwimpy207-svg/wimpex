@@ -5,6 +5,7 @@
   let currentToken = null;
   let isAdmin = false;
   let ws = null;
+  let wsQueue = [];
   let currentFilter = 'none';
   let localStream = null;
   let mediaRecorder = null;
@@ -93,6 +94,14 @@
   const wimpyConversationsList = document.getElementById('wimpyConversationsList');
   const wimpyRefreshBtn = document.getElementById('wimpyRefreshBtn');
   const wimpyNewBtn = document.getElementById('wimpyNewBtn');
+  const wimpyAttachBtn = document.getElementById('wimpyAttachBtn');
+  const wimpyMediaInput = document.getElementById('wimpyMediaInput');
+  const imageEditorModal = document.getElementById('imageEditorModal');
+  const imageEditorCanvas = document.getElementById('imageEditorCanvas');
+  const editorRotateBtn = document.getElementById('editorRotateBtn');
+  const editorCropSquareBtn = document.getElementById('editorCropSquareBtn');
+  const editorSaveBtn = document.getElementById('editorSaveBtn');
+  const editorCancelBtn = document.getElementById('editorCancelBtn');
 
   const storiesGrid = document.getElementById('storiesGrid');
   const newStoryBtn = document.getElementById('newStoryBtn');
@@ -301,6 +310,12 @@
         verifyStatus.textContent = j.error || 'Failed to resend verification';
         return;
       }
+      // If server returned a debug token (no SMTP), surface it to the user and autofill the verify input
+      if (j.token) {
+        verifyStatus.textContent = 'Verification token (dev): ' + j.token;
+        verifyTokenInput.value = j.token;
+        return;
+      }
       verifyStatus.textContent = j.message || 'Verification email resent';
     } catch (e) {
       console.error('Resend verification error', e);
@@ -466,7 +481,14 @@
       onAuthSuccess();
       await loadFriends();
       // Prompt the user to verify their email after signup
-      try { showVerifyModal(); } catch (e) { console.warn('Show verify modal failed', e); }
+      try {
+        showVerifyModal();
+        // If server returned a debug token (no SMTP), auto-fill it for convenience
+        if (payload && payload.debugEmailToken) {
+          verifyStatus.textContent = 'Verification token (dev): ' + payload.debugEmailToken;
+          verifyTokenInput.value = payload.debugEmailToken;
+        }
+      } catch (e) { console.warn('Show verify modal failed', e); }
     } catch (err) {
       console.error('[Signup] Error:', err);
       authError.textContent = err.message;
@@ -597,8 +619,32 @@
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${location.host}`);
 
+    // Wrapper to send or queue messages until the socket is open
+    function sendWS(payload) {
+      try {
+        const body = (typeof payload === 'string') ? payload : JSON.stringify(payload);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(body);
+        } else {
+          wsQueue.push(body);
+          console.debug('[ws] queued message, queueLength=', wsQueue.length);
+        }
+      } catch (e) { console.warn('[ws] send failed', e); }
+    }
+
+    // expose sendWS to other scopes
+    window.sendWS = sendWS;
+
     ws.addEventListener('open', () => {
-      ws.send(JSON.stringify({ type: 'auth', token: currentToken }));
+      // flush queued messages
+      try {
+        while (wsQueue.length) {
+          const item = wsQueue.shift();
+          ws.send(item);
+        }
+      } catch (e) { console.warn('[ws] flush failed', e); }
+      // auth
+      sendWS({ type: 'auth', token: currentToken });
       console.log('✨ Connected to Wimpex');
     });
 
@@ -672,6 +718,28 @@
             if (el) updateMessageStatus(el, 'seen');
           });
         }
+      }
+
+      if (msg.type === 'message-deleted') {
+        try {
+          const { conversationId, messageId, scope } = msg;
+          const currentConvo = window.currentOtherId ? [window.currentOtherId, currentUserId].sort().join('-') : null;
+          // If this deletion applies to the open conversation, update UI
+          if (currentConvo && conversationId === currentConvo) {
+            const el = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (el) {
+              if (scope === 'all') el.remove();
+              else {
+                const content = el.querySelector('.content');
+                if (content) content.innerHTML = '<em style="color:var(--muted)">Message deleted</em>';
+              }
+            }
+          } else {
+            // If not open, optionally update conversation preview badge
+            // (best-effort) mark conversation as having an update
+            console.debug('[ws] message-deleted for conversation', conversationId, messageId, scope);
+          }
+        } catch (e) { console.warn('handle message-deleted failed', e); }
       }
 
       // WebRTC signaling
@@ -788,7 +856,7 @@
           reactions.querySelectorAll('.reaction-btn').forEach(b=> b.style.opacity = (b.innerText === selected ? '1' : '0.5'));
           // send reaction to server (websocket preferred)
           try {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'reaction', messageId: el.dataset.messageId, reaction: selected }));
+            if (window.sendWS) sendWS({ type: 'reaction', messageId: el.dataset.messageId, reaction: selected });
             else fetch('/api/messages/reaction', { method:'POST', headers: {'content-type':'application/json','authorization':`Bearer ${currentToken}`}, body: JSON.stringify({ messageId: el.dataset.messageId, reaction: selected }) }).catch(()=>{});
           } catch (e) { console.warn('send reaction failed', e); }
         });
@@ -803,6 +871,28 @@
         if (messageInput) { messageInput.focus(); messageInput.placeholder = `Replying to: ${window.replyTo.text}`; }
       });
       meta.appendChild(replyBtn);
+      // Delete button (for me / for everyone)
+      const deleteBtn = document.createElement('button'); deleteBtn.type='button'; deleteBtn.className='delete-btn'; deleteBtn.style.marginLeft='8px'; deleteBtn.textContent='Delete';
+      deleteBtn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const choice = confirm('Delete this message for everyone? (Cancel = delete for you only)');
+        const scope = choice ? 'all' : 'me';
+        try {
+          const convoId = [window.currentOtherId, currentUserId].sort().join('-');
+          const mid = el.dataset.messageId;
+          const url = `/api/messages/${encodeURIComponent(convoId)}/${encodeURIComponent(mid)}?scope=${scope}`;
+          const res = await fetch(url, { method: 'DELETE', headers: { 'authorization': `Bearer ${currentToken}` } });
+          if (!res.ok) { const j = await res.json().catch(()=>({})); return alert(j.error || 'Failed to delete message'); }
+          if (scope === 'all') {
+            // remove element
+            el.remove();
+          } else {
+            // mark as deleted for me
+            el.querySelector('.content').innerHTML = '<em style="color:var(--muted)">Message deleted</em>';
+          }
+        } catch (e) { console.warn('delete message failed', e); alert('Failed to delete message'); }
+      });
+      meta.appendChild(deleteBtn);
 
       messagesLog.appendChild(el);
       // auto-scroll for own messages
@@ -819,7 +909,7 @@
       const ids = visibles.map(m => m.dataset.messageId).filter(Boolean);
       if (ids.length === 0) return;
       // send over websocket
-      ws.send(JSON.stringify({ type: 'read', ids, toId: otherId }));
+      if (window.sendWS) sendWS({ type: 'read', ids, toId: otherId });
       // optimistically mark as seen locally
       ids.forEach(id => { const el = document.querySelector(`[data-message-id="${id}"]`); if (el) updateMessageStatus(el, 'seen'); });
     }
@@ -868,8 +958,8 @@
             const img = localEl.querySelector('img'); if (img) img.src = mediaUrl;
 
             // send via websocket including clientId so server can reconcile
-            if (ws && ws.readyState === 1) {
-              ws.send(JSON.stringify({ type: 'message', toId: window.currentOtherId, message: { type: 'image', content: mediaUrl }, clientId }));
+            if (window.sendWS) {
+              sendWS({ type: 'message', toId: window.currentOtherId, message: { type: 'image', content: mediaUrl }, clientId });
             } else {
               // fallback to REST POST
               await fetch('/api/messages', { method: 'POST', headers: { 'content-type':'application/json','authorization':`Bearer ${currentToken}` }, body: JSON.stringify({ toId: window.currentOtherId, type: 'image', content: mediaUrl, clientId }) });
@@ -931,6 +1021,158 @@
     try { if (view === profileView && profileBtn) profileBtn.classList.add('active'); } catch(e){}
 
     if (view === cameraView) initCamera();
+  }
+
+  // ===== STORIES: load and viewer =====
+  async function loadStories() {
+    try {
+      if (!storiesGrid) return;
+      storiesGrid.innerHTML = '<p style="color:var(--muted)">Loading...</p>';
+      const res = await fetch(`${API_PREFIX}/stories`);
+      if (!res.ok) { storiesGrid.innerHTML = '<p style="color:var(--muted)">Failed to load stories</p>'; return; }
+      const list = await res.json();
+      if (!list || list.length === 0) { storiesGrid.innerHTML = '<p style="color:var(--muted)">No stories</p>'; return; }
+      storiesGrid.innerHTML = '';
+      list.forEach(s => {
+        const card = document.createElement('div'); card.className = 'story-card';
+        card.style.cursor = 'pointer';
+        card.innerHTML = `
+          <img src="${s.media}" style="width:100%;height:140px;object-fit:cover;border-radius:8px;" />
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;"><strong>${escapeHtml(s.username)}</strong><span style="font-size:12px;color:var(--muted);">${new Date(s.createdAt).toLocaleString()}</span></div>
+        `;
+        card.addEventListener('click', async () => {
+          try {
+            // mark view
+            await fetch(`${API_PREFIX}/stories/${s.storyId}/view`, { method: 'POST' });
+          } catch(e){}
+          // open viewer
+          const imgEl = document.getElementById('storyImage');
+          const vidEl = document.getElementById('storyVideo');
+          const audioEl = document.getElementById('storyAudio');
+          const captionEl = document.getElementById('storyCaption');
+          const musicInfo = document.getElementById('storyMusicInfo');
+          const usernameEl = document.getElementById('storyUsername');
+          if (!imgEl || !vidEl || !audioEl) return;
+          // reset
+          imgEl.style.display = 'none'; vidEl.style.display = 'none'; audioEl.style.display = 'none';
+          if (s.media && s.media.match(/\.(mp4|webm|ogg)$/i)) {
+            vidEl.src = s.media; vidEl.style.display = 'block'; vidEl.play().catch(()=>{});
+          } else {
+            imgEl.src = s.media; imgEl.style.display = 'block';
+          }
+          if (s.audio) { audioEl.src = s.audio; audioEl.style.display = 'block'; }
+          usernameEl && (usernameEl.textContent = s.username);
+          captionEl && (captionEl.textContent = s.caption || '');
+          musicInfo && (musicInfo.textContent = s.music ? (s.music.name || s.music) : '');
+          const viewer = document.getElementById('storyViewerModal');
+          if (viewer) viewer.classList.remove('hidden');
+        });
+        storiesGrid.appendChild(card);
+      });
+    } catch (e) { console.warn('loadStories error', e); if (storiesGrid) storiesGrid.innerHTML = '<p style="color:var(--muted)">Error loading stories</p>'; }
+  }
+
+  // ===== CAMERA Initialization =====
+  let _cameraInitialized = false;
+  async function initCamera() {
+    try {
+      if (_cameraInitialized) return;
+      _cameraInitialized = true;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return console.warn('Camera not supported');
+
+      console.debug('[camera] requesting media (video+audio)');
+      // Request audio as well so MediaRecorder can record; many browsers require audio permission
+      localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+      console.debug('[camera] getUserMedia success', { tracks: localStream.getTracks().map(t=>({ kind: t.kind, enabled: t.enabled })) });
+
+      if (cameraStream) {
+        cameraStream.srcObject = localStream;
+        cameraStream.play().catch((err)=>{ console.warn('[camera] play failed', err); });
+      }
+
+      // Prepare MediaRecorder for recording functionality
+      try {
+        recordedChunks = [];
+        if (typeof MediaRecorder !== 'undefined') {
+          mediaRecorder = new MediaRecorder(localStream);
+          mediaRecorder.addEventListener('dataavailable', (e)=>{ if (e.data && e.data.size) recordedChunks.push(e.data); });
+          mediaRecorder.addEventListener('start', ()=>{ console.debug('[camera] mediaRecorder started'); if (recordBtn) recordBtn.textContent = 'Stop'; });
+          mediaRecorder.addEventListener('stop', ()=>{ console.debug('[camera] mediaRecorder stopped'); if (recordBtn) recordBtn.textContent = 'Record'; });
+          mediaRecorder.addEventListener('error', (ev)=>{ console.warn('[camera] mediaRecorder error', ev); });
+          console.debug('[camera] MediaRecorder prepared', { mimeType: mediaRecorder.mimeType });
+        } else {
+          console.warn('[camera] MediaRecorder not supported in this browser');
+        }
+      } catch (mrErr) { console.warn('[camera] prepare MediaRecorder failed', mrErr); }
+
+      if (snapBtn) snapBtn.addEventListener('click', () => {
+        console.debug('[camera] snap button clicked');
+        try {
+          const canvas = snapCanvas || document.createElement('canvas');
+          const video = cameraStream;
+          canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          if (snapImage) snapImage.src = dataUrl;
+          if (snapPreview) snapPreview.classList.remove('hidden');
+        } catch (e) { console.warn('snap error', e); }
+      });
+
+      if (resnapBtn) resnapBtn.addEventListener('click', () => { if (snapPreview) snapPreview.classList.add('hidden'); });
+
+      if (sendSnapBtn) sendSnapBtn.addEventListener('click', async () => {
+        try {
+          const img = snapImage && snapImage.src;
+          const caption = snapCaption && snapCaption.value;
+          const music = selectedMusicInput && selectedMusicInput.value;
+          if (!img) return alert('No snap to send');
+          console.debug('[camera] uploading snap');
+          const up = await uploadMediaToCDN(img, 'story.jpg');
+          const mediaUrl = up && (up.url || up.publicUrl) ? (up.url || up.publicUrl) : img;
+          const body = { media: mediaUrl, caption: caption || '', music: music || null };
+          const res = await fetch(`${API_PREFIX}/stories`, { method: 'POST', headers: { 'content-type':'application/json' }, body: JSON.stringify(body) });
+          if (!res.ok) { const j = await res.json().catch(()=>({})); return alert(j.error || 'Failed to post story'); }
+          alert('Story posted');
+          snapPreview && snapPreview.classList.add('hidden');
+          loadStories();
+        } catch (e) { console.error('send snap error', e); alert('Failed to send snap'); }
+      });
+
+      // Recording toggling
+      if (recordBtn) {
+        recordBtn.addEventListener('click', async () => {
+          try {
+            console.debug('[camera] record button clicked', { mediaRecorderState: mediaRecorder && mediaRecorder.state });
+            if (!mediaRecorder) {
+              console.warn('[camera] No mediaRecorder available');
+              return alert('Recording not supported in this browser');
+            }
+            if (mediaRecorder.state === 'recording') {
+              mediaRecorder.stop();
+              // create blob and preview
+              const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' });
+              const url = URL.createObjectURL(blob);
+              // show preview (audio or video)
+              if (snapPreview) snapPreview.classList.remove('hidden');
+              let previewEl = snapPreview.querySelector('.record-preview');
+              if (!previewEl) {
+                previewEl = document.createElement(blob.type.startsWith('audio/') ? 'audio' : 'video');
+                previewEl.className = 'record-preview';
+                previewEl.controls = true;
+                snapPreview.appendChild(previewEl);
+              }
+              previewEl.src = url;
+              if (previewEl.tagName === 'VIDEO') previewEl.play().catch(()=>{});
+              // reset chunks for next recording
+              recordedChunks = [];
+            } else {
+              recordedChunks = [];
+              mediaRecorder.start();
+            }
+          } catch (e) { console.warn('[camera] record toggle failed', e); }
+        });
+      }
+    } catch (e) { console.warn('initCamera error', e); }
   }
 
   function showFriendProfile(friendId, friendName, friendAvatar) {
@@ -1070,6 +1312,22 @@
     } catch (e) { console.warn('updateProfile error', e); }
   }
 
+  // Spotify connect flow: request short-lived session and open popup
+  if (spotifyConnectBtn) spotifyConnectBtn.addEventListener('click', async () => {
+    if (!currentToken) return alert('Log in to connect Spotify');
+    spotifyConnectBtn.disabled = true;
+    try {
+      const res = await fetch('/api/spotify/session', { method: 'POST', headers: { 'authorization': `Bearer ${currentToken}` } });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(j.error || 'Failed to start Spotify auth'); spotifyConnectBtn.disabled = false; return; }
+      const popup = window.open(j.url, 'spotify_auth', 'width=600,height=800');
+      if (!popup) { alert('Popup blocked — allow popups and try again'); spotifyConnectBtn.disabled = false; return; }
+      const poll = setInterval(() => {
+        if (popup.closed) { clearInterval(poll); spotifyConnectBtn.disabled = false; updateProfile(); alert('Spotify auth window closed'); }
+      }, 1000);
+    } catch (e) { console.error('spotify connect error', e); alert('Error starting Spotify auth'); spotifyConnectBtn.disabled = false; }
+  });
+
   // Settings button
   const settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
@@ -1196,7 +1454,7 @@
   const recommendationsBtn = document.getElementById('recommendationsBtn');
   if (recommendationsBtn) {
     recommendationsBtn.addEventListener('click', () => {
-      if (!isAdmin) { switchView(recommendationsView); loadRecommendations(); }
+      if (!isAdmin) { switchView(recommendationsView); loadRecommendations(); loadPendingFriendRequests(); }
     });
   } else console.warn('[ui] recommendationsBtn not found');
 
@@ -1222,6 +1480,7 @@
   const peopleSearchInput = document.getElementById('peopleSearchInput');
   const peopleSearchBtn = document.getElementById('peopleSearchBtn');
   const recommendationsList = document.getElementById('recommendationsList');
+  const pendingRequestsList = document.getElementById('pendingRequestsList');
 
   // Simple debounce
   function debounce(fn, wait = 250) {
@@ -1262,6 +1521,48 @@
         recommendationsList.appendChild(el);
       });
     } catch (e) { console.warn('People search error', e); }
+  }
+
+  // Load pending friend requests for People view
+  async function loadPendingFriendRequests() {
+    try {
+      const el = pendingRequestsList;
+      if (!el) return;
+      el.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
+      const res = await fetch('/api/friend-requests/pending', { headers: { 'authorization': `Bearer ${currentToken}` } });
+      if (!res.ok) { el.innerHTML = '<p style="color:var(--muted);">Failed to load</p>'; return; }
+      const list = await res.json();
+      if (!list || list.length === 0) { el.innerHTML = '<p style="color:var(--muted);">No pending requests</p>'; return; }
+      el.innerHTML = '';
+      list.forEach(r => {
+        const row = document.createElement('div');
+        row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '10px';
+        row.style.padding = '6px'; row.style.borderBottom = '1px solid rgba(255,255,255,0.02)';
+        row.innerHTML = `
+          <img src="${r.fromAvatar || '/placeholder.png'}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" />
+          <div style="flex:1;"><div style="font-weight:600">${r.fromUsername}</div><div style="font-size:12px;color:var(--muted)">${new Date(r.createdAt).toLocaleString()}</div></div>
+          <div style="display:flex;gap:6px"><button class="accept-req gold-btn">Accept</button><button class="decline-req" style="background:transparent;border:1px solid rgba(255,255,255,0.04);padding:6px 8px;border-radius:6px;color:var(--muted);">Decline</button></div>
+        `;
+        const acceptBtn = row.querySelector('.accept-req');
+        const declineBtn = row.querySelector('.decline-req');
+        acceptBtn.addEventListener('click', async () => {
+          acceptBtn.disabled = true; acceptBtn.textContent = 'Accepting...';
+          const r2 = await fetch('/api/friend-requests/accept', { method: 'POST', headers: { 'content-type':'application/json','authorization': `Bearer ${currentToken}` }, body: JSON.stringify({ fromId: r.fromId }) });
+          if (!r2.ok) { acceptBtn.textContent = 'Error'; acceptBtn.disabled = false; return; }
+          acceptBtn.textContent = 'Accepted';
+          try { loadPendingFriendRequests(); updateProfile(); } catch(e){}
+        });
+        declineBtn.addEventListener('click', async () => {
+          declineBtn.disabled = true; declineBtn.textContent = 'Declining...';
+          const r2 = await fetch('/api/friend-requests/decline', { method: 'POST', headers: { 'content-type':'application/json','authorization': `Bearer ${currentToken}` }, body: JSON.stringify({ fromId: r.fromId }) });
+          if (!r2.ok) { declineBtn.textContent = 'Error'; declineBtn.disabled = false; return; }
+          row.remove();
+        });
+        el.appendChild(row);
+      });
+    } catch (e) {
+      console.warn('loadPendingFriendRequests error', e);
+    }
   }
 
   const debouncedRender = debounce((q) => { if (q && q.trim()) renderPeopleResults(q.trim()); else { recommendationsList.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#999;padding:20px;">Type to search users</p>'; } }, 250);
@@ -1390,6 +1691,117 @@
     return { ok: false, url: dataUrl };
   }
 
+  // ---------- Image editor state for attachments ----------
+  let wimpyAttachmentDataUrl = null; // final edited data url
+  let _editorImg = null; // Image object
+  let _editorAngle = 0;
+  function openImageEditorWithDataUrl(dataUrl) {
+    if (!imageEditorModal) return;
+    imageEditorModal.classList.remove('hidden');
+    const canvas = imageEditorCanvas;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      _editorImg = img; _editorAngle = 0;
+      // set canvas to image natural size (limit to 1400px)
+      const max = 1400;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const ratio = Math.min(1, max / Math.max(w,h));
+      canvas.width = Math.round(w * ratio);
+      canvas.height = Math.round(h * ratio);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    };
+    img.src = dataUrl;
+  }
+  function closeImageEditor() { if (!imageEditorModal) return; imageEditorModal.classList.add('hidden'); }
+  function redrawEditor() {
+    if (!imageEditorCanvas || !_editorImg) return;
+    const canvas = imageEditorCanvas; const ctx = canvas.getContext('2d');
+    // rotate around center
+    const w = _editorImg.naturalWidth, h = _editorImg.naturalHeight;
+    const ratio = canvas.width / w;
+    ctx.save(); ctx.clearRect(0,0,canvas.width,canvas.height);
+    if (_editorAngle % 360 === 0) {
+      ctx.drawImage(_editorImg, 0, 0, canvas.width, canvas.height);
+    } else {
+      // simple rotate in-place (canvas is same size)
+      ctx.translate(canvas.width/2, canvas.height/2);
+      ctx.rotate((_editorAngle * Math.PI)/180);
+      ctx.drawImage(_editorImg, -canvas.width/2, -canvas.height/2, canvas.width, canvas.height);
+    }
+    ctx.restore();
+  }
+
+  if (wimpyAttachBtn && wimpyMediaInput) {
+    wimpyAttachBtn.addEventListener('click', () => wimpyMediaInput.click());
+    wimpyMediaInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        // open editor for images; for video just set data url directly
+        if (f.type && f.type.startsWith('image/')) {
+          openImageEditorWithDataUrl(ev.target.result);
+        } else {
+          // set as attachment directly for non-image
+          wimpyAttachmentDataUrl = ev.target.result;
+        }
+      };
+      reader.readAsDataURL(f);
+    });
+  }
+
+  if (editorRotateBtn) editorRotateBtn.addEventListener('click', () => { _editorAngle = (_editorAngle + 90) % 360; redrawEditor(); });
+  if (editorCropSquareBtn) editorCropSquareBtn.addEventListener('click', () => {
+    if (!_editorImg || !imageEditorCanvas) return;
+    const canvas = imageEditorCanvas; const ctx = canvas.getContext('2d');
+    // center square crop
+    const size = Math.min(canvas.width, canvas.height);
+    const sx = Math.round((canvas.width - size)/2); const sy = Math.round((canvas.height - size)/2);
+    const data = ctx.getImageData(sx, sy, size, size);
+    canvas.width = size; canvas.height = size; ctx.putImageData(data, 0, 0);
+  });
+  if (editorSaveBtn) editorSaveBtn.addEventListener('click', () => {
+    if (!imageEditorCanvas) return; wimpyAttachmentDataUrl = imageEditorCanvas.toDataURL('image/jpeg', 0.85); closeImageEditor();
+  });
+  if (editorCancelBtn) editorCancelBtn.addEventListener('click', () => { wimpyAttachmentDataUrl = null; closeImageEditor(); });
+
+  // ---------- Wimpy form submit/attach flow ----------
+  if (wimpyForm) {
+    wimpyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = (wimpyInput && wimpyInput.value) ? wimpyInput.value.trim() : '';
+      if (!text && !wimpyAttachmentDataUrl) return alert('Enter a message or attach media');
+      try {
+        // show pending message in UI
+        const clientId = generateMessageId();
+        if (wimpyMessagesLog) wimpyMessagesLog.innerHTML += `<div class="wimpy-msg own" data-id="${clientId}">You: ${text || '[media]'} <em>...</em></div>`;
+
+        let mediaUrl = null;
+        if (wimpyAttachmentDataUrl) {
+          const up = await uploadMediaToCDN(wimpyAttachmentDataUrl, 'wimpy_attach.jpg');
+          mediaUrl = up && up.url ? up.url : wimpyAttachmentDataUrl;
+        }
+
+        const payload = { text, media: mediaUrl };
+        const res = await fetch('/api/wimpy/message', { method: 'POST', headers: { 'content-type':'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>''); throw new Error(txt || 'Wimpy request failed');
+        }
+        const j = await res.json().catch(()=>null);
+        // display reply
+        if (wimpyMessagesLog) wimpyMessagesLog.innerHTML += `<div class="wimpy-msg reply">Wimpy: ${j && j.reply ? (j.reply.text || JSON.stringify(j.reply)) : 'No reply'}</div>`;
+        // clear inputs
+        if (wimpyInput) wimpyInput.value = '';
+        wimpyAttachmentDataUrl = null;
+      } catch (err) {
+        console.error('Failed to send to Wimpy', err);
+        alert('Failed to send to Wimpy: ' + (err.message || err));
+      }
+    });
+  }
+
   // ===== STORIES =====
   async function loadStories() {
     try {
@@ -1415,7 +1827,14 @@
       friendStories.forEach(story => {
         const card = document.createElement('div');
         card.className = 'story-card';
-        card.innerHTML = `<img src="${story.media}" alt=""><div class="user-info">${story.username}</div>`;
+        card.innerHTML = `<img src="${story.media}" alt=""><div class="user-info">${story.username}</div><div class="story-caption" style="font-size:13px;color:var(--muted);margin-top:6px;">${story.caption || ''}</div>`;
+        // If story has music (from Spotify), show a small music badge and preview button
+        if (story.music && story.music.previewUrl) {
+          const musicBadge = document.createElement('div');
+          musicBadge.className = 'story-music-badge';
+          musicBadge.innerHTML = `<button class="play-music-btn" data-preview="${story.music.previewUrl}" data-track="${encodeURIComponent(story.music.name)}">▶︎ ${story.music.name}</button>`;
+          card.appendChild(musicBadge);
+        }
         card.addEventListener('click', () => viewStory(story));
         storiesGrid.appendChild(card);
       });
@@ -1445,6 +1864,8 @@
 
     storyUsername.textContent = story.username;
     storyTimestamp.textContent = new Date(story.createdAt).toLocaleTimeString();
+    const storyCaptionEl = document.getElementById('storyCaption');
+    if (storyCaptionEl) storyCaptionEl.textContent = story.caption || '';
     // Music / audio handling
     if (story.music && story.music.previewUrl) {
       if (storyAudio) {
@@ -1492,8 +1913,11 @@
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       cameraStream.srcObject = localStream;
+      // Ensure the video element starts playing (some browsers require explicit play)
+      try { await cameraStream.play(); } catch (e) {}
     } catch (err) {
-      alert('Camera access denied');
+      console.warn('initCamera error', err);
+      alert('Camera access denied or not available');
     }
   }
 
@@ -1520,11 +1944,18 @@
     });
   });
 
-  snapBtn.addEventListener('click', () => {
+  if (snapBtn) snapBtn.addEventListener('click', async () => {
+    if (!localStream) await initCamera();
+    // ensure video has data
+    if (!cameraStream.videoWidth || !cameraStream.videoHeight) {
+      try { await cameraStream.play(); } catch(e) {}
+    }
     const ctx = snapCanvas.getContext('2d');
-    snapCanvas.width = cameraStream.videoWidth;
-    snapCanvas.height = cameraStream.videoHeight;
-    ctx.drawImage(cameraStream, 0, 0);
+    const w = cameraStream.videoWidth || 640;
+    const h = cameraStream.videoHeight || 480;
+    snapCanvas.width = w;
+    snapCanvas.height = h;
+    try { ctx.drawImage(cameraStream, 0, 0, w, h); } catch (e) { console.warn('drawImage failed', e); }
     snapImage.src = snapCanvas.toDataURL('image/jpeg', 0.8);
     snapPreview.style.display = 'block';
   });
@@ -1558,11 +1989,68 @@
     });
   }
 
+  // Delegated handler for story music preview playback
+  storiesGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('.play-music-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    const preview = btn.dataset.preview;
+    if (!preview) return alert('No preview available');
+    // Create or reuse an audio element
+    let audio = document.getElementById('storyPreviewAudio');
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = 'storyPreviewAudio';
+      document.body.appendChild(audio);
+    }
+    if (audio.src !== preview) audio.src = preview;
+    if (audio.paused) {
+      audio.play().catch(() => alert('Playback failed'));
+      btn.textContent = '⏸ ' + decodeURIComponent(btn.dataset.track || '') ;
+    } else {
+      audio.pause();
+      btn.textContent = '▶︎ ' + decodeURIComponent(btn.dataset.track || '');
+    }
+  });
+
   resnapBtn.addEventListener('click', () => {
     snapPreview.style.display = 'none';
   });
 
-  recordBtn.addEventListener('click', async () => {
+  // Send snap / story
+  if (sendSnapBtn) sendSnapBtn.addEventListener('click', async () => {
+    if (!snapImage || !snapImage.src) return alert('No snap to send');
+    sendSnapBtn.disabled = true; sendSnapBtn.textContent = 'Sending...';
+    const mediaData = snapImage.src;
+    const filename = 'snap_' + Date.now() + '.jpg';
+    try {
+      const up = await uploadMediaToCDN(mediaData, filename);
+      const mediaUrl = up && up.url ? up.url : mediaData;
+      const caption = (snapCaption && snapCaption.value) ? snapCaption.value : '';
+      const recipient = (snapRecipient && snapRecipient.value) ? (snapRecipient.value.trim() || 'story') : 'story';
+
+      if (recipient.toLowerCase() === 'story') {
+        const r = await fetch('/api/stories', { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${currentToken}` }, body: JSON.stringify({ media: mediaUrl, caption }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Failed to post story');
+        alert('Story posted');
+        snapPreview.style.display = 'none';
+        try { loadStories(); } catch(e) {}
+      } else {
+        const r = await fetch('/api/snaps', { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${currentToken}` }, body: JSON.stringify({ toId: recipient, media: mediaUrl }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Failed to send snap');
+        alert('Snap sent');
+        snapPreview.style.display = 'none';
+      }
+    } catch (e) {
+      console.error('Send snap error', e);
+      alert('Failed to send snap: ' + (e && e.message ? e.message : String(e)));
+    }
+    sendSnapBtn.disabled = false; sendSnapBtn.textContent = 'Send Snap';
+  });
+
+  if (recordBtn) recordBtn.addEventListener('click', async () => {
     if (!mediaRecorder) {
       recordedChunks = [];
       const mimeType = 'video/webm;codecs=vp8,opus';
@@ -1588,7 +2076,7 @@
     }
   });
 
-  swapCameraBtn.addEventListener('click', async () => {
+  if (swapCameraBtn) swapCameraBtn.addEventListener('click', async () => {
     if (localStream) {
       localStream.getTracks().forEach(t => t.stop());
       localStream = null;
@@ -1725,7 +2213,7 @@
     spotifyConnectBtn.addEventListener('click', async () => {
       try {
         // Create a short-lived session on the server which returns the authorize URL
-        const res = await fetch('/api/spotify/session', { method: 'POST', headers: { 'content-type': 'application/json' } });
+        const res = await fetch('/api/spotify/session', { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${currentToken}` } });
         if (!res.ok) {
           const t = await res.text().catch(()=>'');
           return alert('Failed to create Spotify session: ' + t);
@@ -1734,6 +2222,8 @@
         const url = j.url;
         const w = window.open(url, 'spotify_connect', 'width=800,height=700');
         if (!w) return alert('Popup blocked. Please allow popups to connect Spotify.');
+        // poll for popup closed
+        const poll = setInterval(() => { if (w.closed) { clearInterval(poll); updateProfile(); alert('Spotify window closed'); } }, 1000);
       } catch (e) { console.warn('Spotify connect error', e); alert('Failed to start Spotify connect'); }
     });
   }
@@ -3397,9 +3887,7 @@
     });
   }
 
-  // Wimpy attach button wiring
-  const wimpyAttachBtn = document.getElementById('wimpyAttachBtn');
-  const wimpyMediaInput = document.getElementById('wimpyMediaInput');
+  // Wimpy attach button wiring (elements declared earlier)
   if (wimpyAttachBtn && wimpyMediaInput) {
     wimpyAttachBtn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -3420,7 +3908,7 @@
 
   // ===== FRIEND REQUESTS =====
   const friendRequestsModal = document.getElementById('friendRequestsModal');
-  const pendingRequestsList = document.getElementById('pendingRequestsList');
+  const pendingRequestsModalList = document.getElementById('pendingRequestsModalList');
   const noPendingRequests = document.getElementById('noPendingRequests');
 
   async function loadFriendRequests() {
@@ -3431,7 +3919,7 @@
       if (!res.ok) return;
       const requests = await res.json();
       
-      pendingRequestsList.innerHTML = '';
+      pendingRequestsModalList.innerHTML = '';
       if (requests.length === 0) {
         noPendingRequests.style.display = 'block';
         return;
@@ -3453,7 +3941,7 @@
             <button onclick="declineFriendRequest('${req.fromUserId}')" style="padding:6px 12px;background:rgba(212,175,55,0.2);border:2px solid var(--gold);border-radius:6px;color:var(--gold);cursor:pointer;font-weight:bold;">Decline</button>
           </div>
         `;
-        pendingRequestsList.appendChild(card);
+        pendingRequestsModalList.appendChild(card);
       });
     } catch (err) {
       console.error('Error loading friend requests:', err);

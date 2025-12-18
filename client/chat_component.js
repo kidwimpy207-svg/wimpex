@@ -103,9 +103,38 @@
     });
   }
 
-  // Hook into messageForm submit to auto-scroll after sending if user near bottom
+  // Hook into messageForm submit: send messages via queued WS or REST fallback and auto-scroll
   if(messageForm){
-    messageForm.addEventListener('submit', ()=>{ setTimeout(()=> scrollToBottomIfNear(200), 50); });
+    messageForm.addEventListener('submit', async (ev) =>{
+      try {
+        ev.preventDefault();
+        const text = (messageInput.value || '').trim();
+        if (!text) return;
+        const clientId = (typeof window.generateMessageId === 'function') ? window.generateMessageId() : ('m_' + Date.now());
+        const replyMeta = window.replyTo ? { replyTo: window.replyTo.id } : {};
+
+        // optimistic UI
+        if (typeof window.appendMessage === 'function') {
+          try { window.appendMessage('Me', text, 'own', '', 'sending', clientId); } catch (e) { console.warn('appendMessage optimistic failed', e); }
+        }
+
+        const payload = { toId: window.currentOtherId, type: 'text', text, clientId, ...replyMeta };
+
+        if (window.sendWS) {
+          window.sendWS({ type: 'message', ...payload });
+        } else {
+          try {
+            await fetch('/api/messages', { method: 'POST', headers: { 'content-type':'application/json', 'authorization': `Bearer ${window.currentToken}` }, body: JSON.stringify(payload) });
+          } catch (e) { console.warn('messages POST failed', e); }
+        }
+
+        // clear input and reply state
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        if (window.replyTo) { window.replyTo = null; messageInput.placeholder = 'Type a message...'; }
+        setTimeout(()=> scrollToBottomIfNear(120), 60);
+      } catch (e) { console.warn('message send handler failed', e); }
+    });
   }
 
   // Expose small helper for other scripts

@@ -31,7 +31,7 @@
         </div>
         <input id="loginInput" type="text" placeholder="Email / Phone / Username" required>
         <input id="loginPassword" type="password" placeholder="Password" required>
-        <button id="loginBtn" type="submit" class="gold-btn">Login</button>
+        <button id="loginBtn" type="button" class="gold-btn">Login</button>
         <div style="margin-top:8px;text-align:right;"><a id="forgotLink" href="#" style="color:var(--gold);font-weight:600;">Forgot password?</a></div>
       </form>
 
@@ -62,7 +62,7 @@
 
         <input id="signupPassword" type="password" placeholder="Password (min 6 chars)" minlength="6" required>
         <input id="signupConfirm" type="password" placeholder="Confirm Password" required>
-        <button type="submit" class="gold-btn">Create Account</button>
+        <button id="signupBtn" type="button" class="gold-btn">Create Account</button>
       </form>
 
       <div id="authError" class="auth-error hidden"></div>
@@ -95,6 +95,21 @@
       </div>
     </div>
   </div>
+  <script>
+    // Safety: prevent native form submits to avoid full page refresh if app.js fails.
+    (function(){
+      try{
+        ['loginForm','signupForm'].forEach(id => {
+          const f = document.getElementById(id);
+          if (!f) return;
+          f.addEventListener('submit', function(e){ e.preventDefault(); console.warn('[safety] blocked native submit for', id); });
+        });
+        // Bind click fallback to buttons to trigger requestSubmit so app-level handlers still run
+        const lb = document.getElementById('loginBtn'); if (lb) lb.addEventListener('click', ()=>{ const f=document.getElementById('loginForm'); if (f && typeof f.requestSubmit==='function') f.requestSubmit(); else f && f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); });
+        const sb = document.getElementById('signupBtn'); if (sb) sb.addEventListener('click', ()=>{ const f=document.getElementById('signupForm'); if (f && typeof f.requestSubmit==='function') f.requestSubmit(); else f && f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); });
+      }catch(e){ console.error('Form safety init failed', e); }
+    })();
+  </script>
 
   <!-- Sidebar Navigation -->
   <nav class="sidebar hidden">
@@ -211,6 +226,8 @@
           <button id="peopleSearchBtn" class="gold-btn">Search</button>
         </div>
         <div id="recommendationsList" class="recommendations-grid"></div>
+        <h3 style="margin-top:18px;margin-bottom:8px;">Pending Friend Requests</h3>
+        <div id="pendingRequestsList" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow:auto;padding:8px;border:1px solid rgba(255,255,255,0.03);border-radius:8px;background:rgba(255,255,255,0.01);"></div>
         <div id="noRecommendations" class="empty-state hidden">
           <p>🎉 You follow everyone! Check back later for new users.</p>
         </div>
@@ -444,6 +461,20 @@
     </div>
   </div>
 
+  <!-- Image editor modal for attachments -->
+  <div id="imageEditorModal" class="modal hidden">
+    <div class="modal-content" style="max-width:720px;">
+      <h3>Edit Image</h3>
+      <canvas id="imageEditorCanvas" style="width:100%;background:#111;border:1px solid rgba(255,255,255,0.03);display:block;"></canvas>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button id="editorRotateBtn" class="gold-btn">Rotate 90°</button>
+        <button id="editorCropSquareBtn" class="gold-btn">Crop Square</button>
+        <button id="editorSaveBtn" class="gold-btn">Save</button>
+        <button id="editorCancelBtn" class="gold-btn" style="background:transparent;border:1px solid rgba(255,255,255,0.04);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Music Picker Modal (minimal placeholder until Spotify integration) -->
   <div id="musicPickerModal" class="modal hidden">
     <div class="modal-content" style="max-width:520px;">
@@ -519,6 +550,7 @@
       </div>
       <div class="story-info">
         <strong id="storyUsername"></strong>
+        <div id="storyCaption" style="margin-top:6px;color:var(--text-primary);"></div>
         <div id="storyMusicInfo" style="font-size:13px;color:var(--muted);"></div>
         <span id="storyTimestamp"></span>
       </div>
@@ -644,7 +676,7 @@
   <div id="friendRequestsModal" class="modal hidden">
     <div class="modal-content" style="max-width:500px;">
       <h2>👥 Friend Requests</h2>
-      <div id="pendingRequestsList" style="max-height:400px;overflow-y:auto;"></div>
+      <div id="pendingRequestsModalList" style="max-height:400px;overflow-y:auto;"></div>
       <div id="noPendingRequests" style="text-align:center;color:var(--text-secondary);padding:20px;">No pending friend requests</div>
       <button class="close-modal-btn" style="margin-top:16px;">Close</button>
     </div>

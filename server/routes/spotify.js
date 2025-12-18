@@ -85,6 +85,22 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// Debug endpoint: public info about server spotify env configuration
+router.get('/debug', (req, res) => {
+  res.json({
+    envConfigured: !!ensureEnv(),
+    clientIdPresent: !!process.env.SPOTIFY_CLIENT_ID,
+    redirectUri: process.env.SPOTIFY_REDIRECT_URI || null
+  });
+});
+
+// Authenticated: report current user's spotify token state
+router.get('/debug/me', authenticateToken, (req, res) => {
+  const user = state.users[req.user.userId];
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ spotify: user.spotify || null, envConfigured: !!ensureEnv() });
+});
+
 async function refreshTokenForUser(user) {
   if (!user?.spotify?.refresh_token) return false;
   try {

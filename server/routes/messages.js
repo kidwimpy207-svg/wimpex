@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const { state, save } = require('../services/store');
+const { connections } = require('../services/websocket');
 const { authenticateToken } = require('../middleware/auth');
 const { sendPush } = require('../services/notification');
 
@@ -226,6 +227,82 @@ router.get('/sync', authenticateToken, (req, res) => {
         });
     });
     res.json({ undelivered });
+});
+
+// Delete a message for me or for everyone
+router.delete('/:conversationId/:messageId', authenticateToken, (req, res) => {
+    try {
+        const { conversationId, messageId } = req.params;
+        const scope = req.query.scope || 'me'; // 'me' or 'all'
+        let convoId = conversationId;
+        if (!String(conversationId).startsWith('group-')) {
+            // normalize 1:1 conversation id
+            convoId = [req.user.userId, conversationId].sort().join('-');
+        }
+        const msgs = state.messages[convoId] || [];
+        const idx = msgs.findIndex(m => m.id === messageId);
+        if (idx === -1) return res.status(404).json({ error: 'Message not found' });
+        const msg = msgs[idx];
+        if (scope === 'all') {
+            // only allow delete for all from sender or admin
+            if (msg.from !== req.user.userId && !state.admins?.includes(req.user.userId)) return res.status(403).json({ error: 'Not allowed' });
+            msgs.splice(idx, 1);
+            save.messages();
+
+            // Broadcast deletion to all participants in the conversation
+            try {
+                let participants = [];
+                if (String(convoId).startsWith('group-')) {
+                    const gid = convoId.replace(/^group-/, '');
+                    const group = state.groups?.[gid];
+                    participants = group ? group.members : [];
+                } else {
+                    participants = convoId.split('-');
+                }
+
+                const WS = require('ws');
+                participants.forEach(pid => {
+                    const targetWs = connections.get(pid);
+                    if (targetWs && targetWs.readyState === WS.OPEN) {
+                        targetWs.send(JSON.stringify({
+                            type: 'message-deleted',
+                            conversationId: convoId,
+                            messageId,
+                            scope: 'all',
+                            by: req.user.userId
+                        }));
+                    }
+                });
+            } catch (e) { /* best-effort broadcast */ }
+
+            return res.json({ ok: true, deleted: true });
+        } else {
+            // mark deleted for this user
+            if (!msg.deletedFor) msg.deletedFor = [];
+            if (!msg.deletedFor.includes(req.user.userId)) msg.deletedFor.push(req.user.userId);
+            save.messages();
+
+            // Notify the requesting user's other active clients that the message was deleted for them
+            try {
+                const WS = require('ws');
+                const targetWs = connections.get(req.user.userId);
+                if (targetWs && targetWs.readyState === WS.OPEN) {
+                    targetWs.send(JSON.stringify({
+                        type: 'message-deleted',
+                        conversationId: convoId,
+                        messageId,
+                        scope: 'me',
+                        by: req.user.userId
+                    }));
+                }
+            } catch (e) { /* ignore */ }
+
+            return res.json({ ok: true, deletedFor: req.user.userId });
+        }
+    } catch (e) {
+        console.error('[Messages DELETE] Error:', e);
+        res.status(500).json({ error: 'Failed to delete message' });
+    }
 });
 
 module.exports = router;
