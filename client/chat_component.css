@@ -29,6 +29,91 @@
 /* Responsive tweaks */
 @media (max-width:640px){ #chatDetail .message{max-width:86%} #chatDetail .chat-header .chat-info{max-width:60%} }
 
+/* Mobile layout improvements: prevent bottom nav overlap and classic composer */
+@media (max-width: 768px) {
+	/* Ensure general views reserve space for bottom nav */
+	.view { padding-bottom: 96px; }
+
+	/* Make the chat composer fixed above the bottom nav so it never gets covered */
+	#chatDetail .chat-footer {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: calc(70px + 8px); /* nav height + small gap */
+		height: 56px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 12px;
+		background: linear-gradient(180deg, rgba(11,11,13,0.8), rgba(11,11,13,0.6));
+		border-top: 1px solid rgba(255,255,255,0.03);
+		z-index: 60;
+	}
+
+	/* Classic single-line message input look */
+	#chatDetail .chat-footer #messageInput,
+	#chatDetail .message-input textarea,
+	#chatDetail .message-input input[type="text"] {
+		height: 40px !important;
+		min-height: 40px;
+		max-height: 40px;
+		padding: 8px 10px;
+		border-radius: 8px;
+		font-size: 15px;
+		line-height: 20px;
+		overflow: hidden;
+	}
+
+	/* Tighter send button */
+	#chatDetail .chat-footer .send-btn,
+	#chatDetail .message-input .send-btn { padding: 8px 10px; border-radius:8px; height:40px; }
+
+	/* Ensure messages area has enough bottom padding to not be hidden behind fixed composer */
+	#chatDetail .messages-log { padding-bottom: 160px; }
+
+	/* Slightly reduce header height on phones */
+	#chatDetail .chat-header { height:64px; flex:0 0 64px; }
+}
+
+/* WhatsApp-like mobile chat tweaks */
+@media (max-width: 768px) {
+	/* Sticky header like WhatsApp */
+	#chatDetail .chat-header { position: sticky; top: 0; z-index: 70; background: linear-gradient(180deg, rgba(11,11,13,0.95), rgba(11,11,13,0.85)); }
+
+	/* Messages list: allow full-viewport scrolling and touch momentum */
+	#chatDetail .messages-log {
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		padding: 12px 12px 200px 12px; /* large bottom padding so last message isn't hidden */
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		align-items: stretch;
+		max-height: calc(100vh - 64px - 72px); /* header + composer/nav area */
+	}
+
+	/* Bubble styling similar to WhatsApp */
+	#chatDetail .messages-log .message { max-width: 78%; padding:10px 12px; border-radius:18px; }
+	#chatDetail .messages-log .message.other { background: #f1f0f0; color: #111; align-self:flex-start; border-top-left-radius:6px; }
+	#chatDetail .messages-log .message.own { background: #dcf8c6; color: #000; align-self:flex-end; border-top-right-radius:6px; }
+
+	/* Timestamps/meta small and subtle */
+	#chatDetail .messages-log .message .meta { font-size:11px; color: #6b6b6b; margin-top:6px; }
+
+	/* Avatar in header bigger and round */
+	.chat-header-avatar { width:40px; height:40px; border-radius:50%; display:inline-block; }
+
+	/* Make text input very simple and classic */
+	#chatDetail .chat-footer #messageInput { border-radius: 999px; padding: 10px 14px; background: #fff; color: #111; border: none; }
+	#chatDetail .chat-footer { align-items:center; }
+
+	/* Ensure media (images) inside messages are responsive and rounded */
+	#chatDetail .messages-log .message img { max-width: 100%; border-radius: 12px; display:block; }
+
+	/* Ensure new message indicator above composer */
+	#chatDetail #newMessageIndicator{bottom:calc(72px + 96px);right:20px}
+}
+
 /* Message status indicator and animations */
 #chatDetail .message-status{display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:11px;color:var(--muted);opacity:0.95;transition:opacity 220ms ease, transform 220ms ease}
 #chatDetail .message-status .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.12);display:inline-block;transform:scale(1);transition:transform 260ms ease, background 260ms ease}
