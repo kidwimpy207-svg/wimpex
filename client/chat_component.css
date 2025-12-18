@@ -50,6 +50,40 @@
 #chatDetail .chat-last-status.status-sent{color:rgba(255,255,255,0.75)}
 #chatDetail .chat-last-status.status-delivered{color:var(--out-left)}
 #chatDetail .chat-last-status.status-seen{color:#6ee7b7;font-weight:700}
+
+/* Compatibility overrides for chat component (helps when JS uses #messagesLog id) */
+#messagesLog, .messages-log, .messages { min-height: 0; flex: 1 1 auto; display:flex; flex-direction:column; justify-content:flex-end; overflow-y:auto; -webkit-overflow-scrolling: touch; }
+#messagesLog .message, .messages-log .message { word-break: break-word; }
+#messagesLog img, .messages img { max-width:100%; height:auto; border-radius:10px; display:block }
+#chatDetail .messages-log { padding-bottom: 20px; }
+
+/* Ensure composer/footer is stable */
+#chatDetail .chat-footer, #chatDetail .message-input { flex-shrink:0; min-height:56px }
+
+/* Camera/video safety */
+#cameraStream, .camera-feed { width:100%; max-height:60vh; object-fit:cover; border-radius:12px }
+
+/* End overrides */
+
+/* High specificity overrides to ensure chat area is scrollable and layouts apply */
+#chatDetail{position:relative;}
+#chatDetail .messages-log{min-height:0;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:12px 14px;gap:12px}
+#chatDetail .messages-log .message{max-width:76%;padding:10px 12px;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,0.5);word-break:break-word}
+#chatDetail .messages-log .message.other{align-self:flex-start;background:var(--incoming);color:#d7d7da}
+#chatDetail .messages-log .message.own{align-self:flex-end;background:linear-gradient(90deg,var(--out-left),var(--out-right));color:#07101a}
+#chatDetail .messages-log .message img{max-width:100%;border-radius:10px;display:block}
+
+/* Composer / input area rules (match DOM classes exactly) */
+#chatDetail .message-input{display:flex;gap:8px;align-items:center;padding:12px;border-top:1px solid rgba(255,255,255,0.02);background:transparent;flex-shrink:0}
+#chatDetail .message-input textarea,#chatDetail .message-input input[type="text"]{flex:1;min-height:40px;max-height:140px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.01);color:#fff;resize:none}
+#chatDetail .message-input .send-btn{padding:10px;border-radius:10px}
+
+/* Reply / delete buttons in message meta */
+#chatDetail .message .meta .reply-btn,#chatDetail .message .meta .delete-btn{padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted);cursor:pointer}
+
+/* Ensure new message indicator is above content */
+#chatDetail #newMessageIndicator{position:absolute;right:20px;bottom:100px;z-index:30}
+
 /* Chat component styles scoped to existing chatDetail structure */
 :root{ --chat-bg:#050506; --panel:#0b0b0d; --muted:#8b8b93; --incoming:#1f1f23; --out-left:#06b6d4; --out-right:#ff6b9e; }
 /* Ensure high specificity by scoping under #chatDetail */

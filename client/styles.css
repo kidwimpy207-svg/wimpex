@@ -933,6 +933,102 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
   padding: 8px;
   transition: all 0.3s ease;
 }
+  align-items: center;
+  justify-content: center;
+  align-items: center;
+
+/* Stories grid */
+#storiesView { padding: 18px; }
+.stories-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: 12px; }
+.story-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-radius: 10px; padding: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.03); }
+.story-card img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; display:block; }
+.story-card .meta { padding: 8px 6px; font-size: 12px; color: var(--muted); }
+
+/* Camera & snap preview */
+#cameraView { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+#cameraStream { width: 100%; height: 320px; background: #000; border-radius: 12px; object-fit: cover; }
+.snap-preview { display: none; position: relative; border-radius: 10px; overflow: hidden; }
+.snap-preview.visible { display: block; }
+.record-preview { max-width: 100%; border-radius: 8px; margin-top: 8px; }
+
+/* Message controls */
+.reply-btn, .delete-btn { background: transparent; border: 1px solid rgba(255,255,255,0.03); color: var(--muted); padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.reply-btn:hover, .delete-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Spotify connect status */
+.spotify-status { font-size: 13px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+.spotify-status.connected { color: var(--success); }
+
+/* Chat message bubbles */
+#chatDetail .messages-log { display:flex; flex-direction:column; justify-content:flex-end; }
+.message { max-width: 72%; padding: 10px 12px; border-radius: 14px; box-shadow: 0 8px 18px rgba(2,6,23,0.6); display: inline-block; word-break: break-word; }
+.message .content { display:block; }
+.message .meta { display:flex; gap:8px; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); }
+.message.own { align-self: flex-end; background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #07101a; border-bottom-right-radius: 6px; }
+.message.other { align-self: flex-start; background: rgba(255,255,255,0.02); color: var(--muted); border-bottom-left-radius: 6px; }
+.message img { max-width: 100%; border-radius: 10px; display:block; }
+
+/* Chat input/footer inside chatDetail */
+#chatDetail .message-input { display:flex; gap:8px; align-items:center; padding:12px; border-top: 1px solid rgba(255,255,255,0.03); background: linear-gradient(180deg, rgba(0,0,0,0.02), transparent); flex-shrink:0; }
+#chatDetail .message-input textarea { flex:1; min-height:40px; max-height:120px; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.03); background: rgba(255,255,255,0.01); color:var(--muted); resize:none; }
+
+/* Camera view tweaks */
+#cameraView { display:flex; flex-direction:column; gap:12px; padding:12px; }
+#cameraStream { width:100%; height:360px; background:#000; border-radius:12px; object-fit:cover; }
+.camera-controls { display:flex; gap:8px; justify-content:center; align-items:center; }
+.snap-preview { display:none; }
+.snap-preview.visible { display:block; }
+
+/* Make sure reply/delete buttons are compact inside message meta */
+.message .meta .reply-btn, .message .meta .delete-btn { padding:6px 8px; font-size:12px; border-radius:8px; }
+
+/* Ensure stories grid container id maps */
+#storiesGrid { display:block; }
+#storiesGrid .stories-grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+
+  justify-content: center;
+
+
+/* ===== STORIES & CAMERA ===== */
+.stories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.story-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  border: 1px solid rgba(255,255,255,0.03);
+  border-radius: 12px;
+  padding: 10px;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.story-card:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
+
+.camera-container { display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:flex-start;padding:12px; }
+.camera-feed { width:100%; max-width:640px; border-radius:12px; background:#000; box-shadow:var(--shadow); }
+.camera-controls { display:flex;gap:8px;align-items:center;justify-content:center;margin-top:8px; }
+.snap-preview { display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border:1px solid rgba(255,255,255,0.03); }
+.snap-preview.hidden { display:none !important; }
+.snap-preview img { max-width:320px; border-radius:8px; }
+
+/* ===== FRIEND REQUESTS ===== */
+.recommendations-container { padding:16px; }
+.recommendation { padding:10px; border-radius:10px; background:rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.03); }
+.friend-request-card { display:flex;align-items:center;gap:12px;padding:12px;background:var(--gold-soft);border-radius:8px;margin-bottom:10px;border-left:3px solid var(--gold); }
+.friend-request-card img { width:50px;height:50px;border-radius:50%;object-fit:cover; }
+.friend-request-card button { padding:8px 10px;border-radius:8px;border:none;cursor:pointer;font-weight:700 }
+
+/* Modal pending requests list inside friendRequestsModal */
+#pendingRequestsModalList { max-height:380px; overflow:auto; display:flex;flex-direction:column;gap:8px; padding-right:6px; }
+
+/* Inline pending list in recommendations view */
+#pendingRequestsList { display:flex; flex-direction:column; gap:8px; }
+
+/* ===== SPOTIFY STATUS ===== */
+#spotifyConnectStatus { margin-top:12px; font-size:13px; color:#999; }
 
 .back-btn:hover {
   color: var(--primary-dark);
@@ -2271,3 +2367,34 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
     padding: 32px 20px;
   }
 }
+
+/* ===== Compatibility overrides (ensure chat/camera/stories layouts behave reliably) ===== */
+/* Make chat containers resilient to different DOM ids/classes used by updated scripts */
+#chatDetail, .chat-app, .main-container { display: flex; flex-direction: column; height: 100vh; min-height: 0; }
+
+/* Ensure the messages area always allows internal scrolling and lays messages bottom-up */
+#messagesLog, .messages, .messages-log, #chatDetail .messages-log { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-end; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+
+/* Make message bubbles wrap and media responsive */
+#messagesLog .message, .messages .message, .messages-log .message { word-break: break-word; hyphens: auto; }
+#messagesLog img, .messages img, .messages-log img { max-width: 100%; height: auto; border-radius: 10px; display: block; }
+
+/* Composer safety: ensure footer doesn't collapse and height calculations work */
+.message-input, .chat-footer, #chatDetail .chat-footer, #chatDetail .message-input { flex-shrink: 0; min-height: 56px; }
+
+/* Camera / snap preview constraints */
+#cameraStream, .camera-feed, video.camera-feed { width: 100%; max-height: 60vh; object-fit: cover; border-radius: 12px; background: #000; }
+#snapPreview, .snap-preview { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+#snapPreview img, #snapPreview video, .snap-preview img, .snap-preview video { max-width: 100%; border-radius: 12px; }
+
+/* Stories grid responsiveness */
+#storiesGrid, .stories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; align-items: start; }
+
+/* Small helper to ensure hidden elements do not collapse layout unexpectedly */
+.view.hidden { display: none !important; }
+
+/* Provide a high-specificity rule to enforce scrollbars where needed */
+#chatDetail .messages-log::-webkit-scrollbar, #messagesLog::-webkit-scrollbar { width: 10px; }
+#chatDetail .messages-log::-webkit-scrollbar-thumb, #messagesLog::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius: 8px; }
+
+/* End compatibility overrides */
