@@ -1348,12 +1348,39 @@
   async function registerSW() {
     if ('serviceWorker' in navigator) {
       try {
-        const reg = await navigator.serviceWorker.register('/service-worker.js');
+        const reg = await navigator.serviceWorker.register('/sw.js');
         return reg;
       } catch (e) { console.error('SW registration failed', e); }
     }
     return null;
   }
+
+  // PWA install prompt handling
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (installBtn) installBtn.style.display = 'block';
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      try {
+        const choice = await deferredInstallPrompt.userChoice;
+        console.log('[PWA] install choice', choice);
+        if (choice && choice.outcome === 'accepted') installBtn.style.display = 'none';
+      } catch (e) { console.warn('[PWA] prompt choice error', e); }
+      deferredInstallPrompt = null;
+    });
+  }
+
+  window.addEventListener('appinstalled', () => {
+    if (installBtn) installBtn.style.display = 'none';
+    console.log('[PWA] appinstalled');
+  });
 
   async function subscribePush() {
     if (!currentToken) return alert('Log in to enable notifications');
@@ -4791,4 +4818,16 @@
   }
 
   console.log('🌟 Wimpex loaded with WebRTC calling');
+// Register service worker for PWA installability and push notifications
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/service-worker.js');
+      console.log('[SW] Registered service worker at', reg.scope);
+    } catch (err) {
+      console.warn('[SW] Service worker registration failed', err);
+    }
+  });
+}
+
 })();
